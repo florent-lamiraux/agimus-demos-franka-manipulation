@@ -41,13 +41,13 @@ This file explains how to
   ```
   This should compute some paths going to configurations where the robot
   looks at the chessboard.
-  
+
   In the same terminal, display the robot and environment:
-  
+
   ```
   >>> v = vf.createViewer()
   ```
-  
+
 10. place the chessboard as shown in `gepetto-gui`.
 
 11. in a new terminal,
@@ -61,5 +61,5 @@ This file explains how to
     - save the data in directory `measurements`,
     - compute the pose of the camera in the end effector, and
     - save it in `config/calibrated-params.yaml`.
-    
-12. You can then commit those changes and re-install agimus-demos package.
+
+12. You can then commit the latter file and re-install agimus-demos package.
