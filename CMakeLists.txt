@@ -78,6 +78,7 @@ INSTALL(FILES
 INSTALL(FILES
   supervisor.py
   demo.yaml
+  demo-calibration.yaml
   DESTINATION
   ${CATKIN_PACKAGE_SHARE_DESTINATION}/franka/manipulation
   )

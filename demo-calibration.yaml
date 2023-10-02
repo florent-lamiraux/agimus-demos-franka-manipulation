@@ -1,0 +1,11 @@
+demo:
+  robots:
+    pandas:
+      srdf:
+        package: agimus_demos
+        file: franka/manipulation/srdf/demo.srdf
+  grippers:
+    [pandas/panda2_gripper,]
+
+sot:
+  robot: franka

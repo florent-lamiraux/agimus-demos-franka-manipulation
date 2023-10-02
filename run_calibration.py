@@ -27,17 +27,8 @@
 
 from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
 
-def playAllPaths (startIndex):
-    i = startIndex
-    nbPaths = cc.hppClient.problem.numberPaths ()
-    while i < nbPaths:
-        cc.playPath (i)
-        if not cc.errorOccured:
-            print("Ran {}".format(i))
-            i+=1
-        #rospy.sleep (1)
-
 if __name__ == '__main__':
+    import rospy
     cc = CalibrationControl ()
     cc.endEffectorFrame = "panda2_ref_camera_link"
     cc.mountFrame = "panda2_hand"
@@ -47,7 +38,16 @@ if __name__ == '__main__':
         'panda2_joint4', 'panda2_joint5', 'panda2_joint6',
         'panda2_joint7', 'panda2_finger_joint1', 'panda2_finger_joint2', ]
 
-    playAllPaths(0)
+    rospy.sleep (5.)
+    i = 0
+    nbPaths = cc.hppClient.problem.numberPaths ()
+    while i < nbPaths - 1:
+        cc.playPath (i)
+        if not cc.errorOccured:
+            print("Ran {}".format(i))
+            i+=1
+    if nbPaths > 1:
+        cc.playPath(nbPaths - 1, collect_data = False)
     cc.save()
     cc.computeHandEyeCalibration()
     eMc = cc.computeCameraPose()

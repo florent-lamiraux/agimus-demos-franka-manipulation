@@ -5,6 +5,7 @@
        default="$(find agimus_demos)/franka/manipulation/supervisor.py" />
   <!-- whether the demonstration is run in simulation or on the real robot -->
   <arg name="simulation" default="false"/>
+  <arg name="calibration" default="false"/>
   <include file="$(find sot_universal_robot)/launch/controller.launch">
     <arg name="simulation" value="$(arg simulation)"/>
     <arg name="robot" value="franka"/>
@@ -28,7 +29,11 @@
   <node pkg="agimus_demos" type="franka_manipulation_gripper_control.py"
         name="gripper_control"/>
   <rosparam command="load"
-	    file="$(find agimus_demos)/franka/manipulation/demo.yaml"/>
+	    file="$(find agimus_demos)/franka/manipulation/demo-calibration.yaml"
+            if="$(arg calibration)"/>
+  <rosparam command="load"
+	    file="$(find agimus_demos)/franka/manipulation/demo.yaml"
+            unless="$(arg calibration)"/>
   <include file="$(find agimus)/launch/path_execution.launch">
     <arg name="gui" value="false"/>
   </include>

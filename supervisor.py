@@ -138,7 +138,11 @@ def makeSupervisorWithFactory(robot):
     robotDict = globalDemoDict["robots"]
     if len(robotDict) != 1:
         raise RuntimeError("One and only one robot is supported for now.")
-    objectDict = globalDemoDict["objects"]
+    if "objects" in globalDemoDict:
+        objectDict = globalDemoDict["objects"]
+    else:
+        objectDict = dict()
+
     objects = list(objectDict.keys())
     # parse robot and object srdf files
     srdfDict = dict()
@@ -166,21 +170,26 @@ def makeSupervisorWithFactory(robot):
         "position": [1.05, 0.5, 1.,0,-sqrt(2)/2,0,sqrt(2)/2],
         "name": "goal/gripper2", "robot": "pandas"
     }
-    # Add goal handles
-    srdfDict["part"]["handles"]["part/center1"] = {
-        "robot": "part", "name": "part/center1", "clearance": 0.03,
-        "link": "part/base_link", "position": [0,0,0,0,sqrt(2)/2,0,sqrt(2)/2],
-        "mask": 3*[True] + [False, True, True]
-    }
-    srdfDict["part"]["handles"]["part/center2"] = {
-        "robot": "part", "name": "part/center2", "clearance": 0.03,
-        "link": "part/base_link", "position": [0,0,0,0,-sqrt(2)/2,0,sqrt(2)/2],
-        "mask": 3*[True] + [False, True, True]
-    }
+    if "part" in srdfDict:
+        # Add goal handles
+        srdfDict["part"]["handles"]["part/center1"] = {
+            "robot": "part", "name": "part/center1", "clearance": 0.03,
+            "link": "part/base_link", "position":
+            [0,0,0,0,sqrt(2)/2,0,sqrt(2)/2],
+            "mask": 3*[True] + [False, True, True]
+        }
+        srdfDict["part"]["handles"]["part/center2"] = {
+            "robot": "part", "name": "part/center2", "clearance": 0.03,
+            "link": "part/base_link", "position":
+            [0,0,0,0,-sqrt(2)/2,0,sqrt(2)/2],
+            "mask": 3*[True] + [False, True, True]
+        }
 
-    grippers = list(globalDemoDict["grippers"])
-    grippers.append("goal/gripper1")
-    grippers.append("goal/gripper2")
+    grippers = list()
+    if "grippers" in globalDemoDict:
+        grippers = list(globalDemoDict["grippers"])
+        grippers.append("goal/gripper1")
+        grippers.append("goal/gripper2")
 
     handlesPerObjects = list()
     contactPerObjects = list()
@@ -193,7 +202,8 @@ def makeSupervisorWithFactory(robot):
         for k, data in srdfDict.items():
             srdf[w].update(data[w])
 
-    envContactSurfaces = list(globalDemoDict["contact surfaces"])
+    envContactSurfaces = list()
+    envContactSurfaces = list(globalDemoDict.get("contact surfaces",[]))
     print (f"env contact surfaces: {envContactSurfaces}")
     supervisor = Supervisor(robot, prefix=list(robotDict.keys())[0])
     factory = Factory(supervisor)
@@ -208,8 +218,9 @@ def makeSupervisorWithFactory(robot):
 
     from hpp.corbaserver.manipulation import Rule
     factory.setupFrames(srdf["grippers"], srdf["handles"], robot)
-    for k in handlesPerObjects[0]:
-        factory.handleFrames[k].hasVisualTag = False
+    if len(handlesPerObjects) > 0:
+        for k in handlesPerObjects[0]:
+            factory.handleFrames[k].hasVisualTag = False
     factory.setupContactFrames(srdf["contacts"])
     # Read rules if published in ros parameter
     if "rules" in globalDemoDict:
