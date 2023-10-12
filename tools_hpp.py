@@ -25,7 +25,13 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import numpy as np
+import os
+import rospy, tf2_ros
+import numpy
 from hpp import Transform
+from math import sqrt, pi
+from pinocchio import XYZQUATToSE3, SE3ToXYZQUAT
+from agimus_demos.tools_hpp import RosInterface as Parent
 
 ## Randomly shoot a configuration where the part is in the box
 def shootPartInBox(robot, q0):
@@ -73,8 +79,10 @@ def displayGripper(viewer, name):
     viewer.client.gui.applyConfiguration(gname, pose)
 
 # Generate target config from randomly sampled configurations
+# Default Nsample = 20
+# len(binPicking.goalConfigs['preplace']['pandas/panda2_gripper'].keys())
 
-def generateTargetConfig(robot, graph, edge, q, Nsamples = 20):
+def generateTargetConfig(robot, graph, edge, q, Nsamples = 50):
     res = False
     for i in range(Nsamples + 1):
         if i == 0:
@@ -91,3 +99,50 @@ def generateTargetConfig(robot, graph, edge, q, Nsamples = 20):
         return True, q1
     else:
         return False, q
+
+class RosInterface(Parent):
+    def getObjectPose(self, q0, timeout=5):
+        # the object should be placed wrt to the robot, as this is what the
+        # sensor tells us.
+        # Get pose of object wrt to the camera using TF
+        cameraFrame = self.robot.opticalFrame
+        self.tfBuffer = tf2_ros.Buffer()
+        self.listener = tf2_ros.TransformListener(self.tfBuffer)
+        qres = q0[:]
+        objectFrame = 'object_tless_1_1'
+
+        print("[INFO] Poses not published yet. Waiting for pose to be published.")
+        print("[INFO] You need to launch the 'happypose_inference' service.")
+        print("...")
+
+        while not self.tfBuffer.can_transform(cameraFrame, objectFrame, rospy.Time()):
+            rospy.sleep(0.01)
+        
+        print("[INFO] Pose found !")
+        print("... Starting calculating transform in the camera frame land mark ...")
+        wMc = XYZQUATToSE3(self.robot.hppcorba.robot.getJointsPosition(q0, [self.robotPrefix + cameraFrame])[0])
+        print(f"wMc = {wMc}")
+        try:
+            _cMo = self.tfBuffer.lookup_transform(cameraFrame, objectFrame, rospy.Time(), rospy.Duration(timeout))
+            _cMo = _cMo.transform
+            # renormalize quaternion
+            x = _cMo.rotation.x
+            y = _cMo.rotation.y
+            z = _cMo.rotation.z
+            w = _cMo.rotation.w
+            n = sqrt(x*x+y*y+z*z+w*w)
+        except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
+                tf2_ros.ExtrapolationException) as e:
+            print('could not get TF transform : ', e)
+            raise RuntimeError(str(e))
+        cMo = XYZQUATToSE3([_cMo.translation.x, _cMo.translation.y,
+                            _cMo.translation.z, _cMo.rotation.x/n,
+                            _cMo.rotation.y/n, _cMo.rotation.z/n,
+                            _cMo.rotation.w/n])
+        print(f"cMo = {cMo}")
+        rk = self.robot.rankInConfiguration['part/root_joint']
+        assert self.robot.getJointConfigSize('part/root_joint') == 7
+        print(f"wMo = {wMc * cMo}")
+        qres[rk:rk+7] = SE3ToXYZQUAT (wMc * cMo)
+            
+        return qres

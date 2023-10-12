@@ -7,6 +7,7 @@
 3. activate FCI,
 4. in terminal 1, in this directory
    ```bash
+   cd ~/devel/src/agimus-demos/franka/manipulation
    roslaunch robot.launch arm_id:=panda2 robot_ip:=172.17.1.3
    ```
 5. to start the camera
@@ -29,13 +30,24 @@
    gepetto-gui
    ```
 
-9. launch the script that computes path starting from the initial configuration
-   of the robot
+9. Launch ros_cosypose 'happy_realtime_camera.launch'
    ```
-   python - script_hpp.py
+   roslaunch ros_cosypose happy_realtime_camera.launch
    ```
 
-10. To execute a path
+10. launch the script that computes path starting from the initial configuration
+   of the robot
+   ```
+   cd ~/devel/src/agimus-demos/franka/manipulation
+   python -i script_hpp.py
+   ```
+
+11. When the script ask you to launch the service, enter the command : 
+   ```
+   rosservice call happypose_inference
+   ```
+
+12. To execute a path
    ```
    rosrun agimus rqt_path_execution
    ```

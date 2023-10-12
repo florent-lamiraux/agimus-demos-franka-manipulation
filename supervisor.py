@@ -26,6 +26,7 @@
 
 import time
 import numpy as np
+import rospy
 from math import sqrt
 from dynamic_graph.ros import RosPublish, RosSubscribe
 from agimus_sot.action import Action
@@ -67,17 +68,21 @@ class OpenGripper(object):
         self.ros_publish.signal("trigger").recompute(t)
         # wait for gripper feedback
         self.ros_subscribe.signal('sout').recompute(t)
-        res = self.ros_subscribe.signal('sout').value
+        res = None
+        # Wait for gripper_control to publish 0 in /agimus/gripper/feedback
+        while res != 0:
+            res = self.ros_subscribe.signal('sout').value
         while res == 0:
             time.sleep(.1)
             t = self.robot.device.state.time
             self.ros_subscribe.signal('sout').recompute(t)
             res = self.ros_subscribe.signal('sout').value
-        if res == 1:
-            return True, ""
-        if res == -1:
-            return False, "Failed to open the gripper."
-        rospy.loginfo(f"res = {res} is not a regular value.")
+            if res == 1:
+                return True, ""
+            if res == -1:
+                return False, "Failed to open the gripper."
+            rospy.loginfo(f"res = {res} is not a regular value.")
+        return 0
 
 class CloseGripper(object):
     """
@@ -111,18 +116,21 @@ class CloseGripper(object):
         self.ros_publish.signal("trigger").recompute(t)
         # wait for gripper feedback
         self.ros_subscribe.signal('sout').recompute(t)
-        res = self.ros_subscribe.signal('sout').value
+        res = None
+        # Wait for gripper_control to publish 0 in /agimus/gripper/feedback
+        while res != 0:
+            res = self.ros_subscribe.signal('sout').value
         while res == 0:
             time.sleep(.1)
             t = self.robot.device.state.time
             self.ros_subscribe.signal('sout').recompute(t)
             res = self.ros_subscribe.signal('sout').value
-        if res == 1:
-            return True, ""
-        if res == -1:
-            return False, "Failed to open the gripper."
-        rospy.loginfo(f"res = {res} is not a regular value.")
-
+            if res == 1:
+                return True, ""
+            if res == -1:
+                return False, "Failed to close the gripper."
+            rospy.loginfo(f"res = {res} is not a regular value.")
+        return 0
 
 
 def makeSupervisorWithFactory(robot):
@@ -249,10 +257,19 @@ def makeSupervisorWithFactory(robot):
         if transitionName_12 in supervisor.actions:
             supervisor.actions[transitionName_12].preActions.append(openGripper)
             transitionName_23 = f'{g} > {h} | f_23'
-            supervisor.actions[transitionName_23].preActions.append(
-                closeGripper)
-            transitionName_21 = f'{g} < {h} | {ig}-{ih}_21'
-            supervisor.actions[transitionName_21].preActions.append(openGripper)
+            supervisor.actions[transitionName_23].preActions.append(closeGripper)
+            
+    # Find transitions that release the object to insert gripper opening action
+    gripper = grippers[0]
+    transitions = list(supervisor.actions.keys())
+    # name should start with the name of the robot gripper ("gripper < handle")
+    t1 = list(filter(lambda s:s.startswith(gripper), transitions))
+    # starting state contains 2 grasps
+    t2 = list(filter(lambda s:s.find(':') != -1, t1))
+    # first transition that releases the grasp
+    t3 = list(filter(lambda s:s.find('_21') != -1, t2))
+    for transitionName_21 in t3:
+        supervisor.actions[transitionName_21].preActions.append(openGripper)
     supervisor.makeInitialSot()
     return factory, supervisor
 

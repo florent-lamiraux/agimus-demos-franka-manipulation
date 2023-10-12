@@ -30,13 +30,18 @@ from hpp.corbaserver.manipulation import Robot, \
     createContext, newProblem, ProblemSolver, ConstraintGraph, \
     ConstraintGraphFactory, CorbaClient, SecurityMargins
 from hpp.gepetto.manipulation import ViewerFactory
-from agimus_demos.tools_hpp import RosInterface
 from hpp.corbaserver import wrap_delete
 from tools_hpp import displayGripper, displayHandle, generateTargetConfig, \
-    shootPartInBox
+    shootPartInBox, RosInterface
 from bin_picking import BinPicking
 
-connectedToRos = False
+import rospy
+import sys
+
+print("[START]")
+print("To avoid crash during constrain graph building, kill the hppcorbaserver process once in a while.")
+
+connectedToRos = True
 
 try:
     import rospy
@@ -68,6 +73,7 @@ loadServerPlugin(defaultContext, "bin_picking.so")
 newProblem()
 
 robot = Robot("robot", "pandas", rootJointType="anchor")
+robot.opticalFrame='camera_color_optical_frame'
 shrinkJointRange(robot, [f'pandas/panda2_joint{i}' for i in range(1,8)],0.95)
 ps = ProblemSolver(robot)
 
@@ -103,9 +109,9 @@ robot.client.manipulation.robot.insertRobotSRDFModelFromString(
 
 # Discretize handles
 ps.client.manipulation.robot.addGripper("pandas/support_link", "goal/gripper1",
-    [1.05, 0.4, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
+    [1.05, -0.05, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
 ps.client.manipulation.robot.addGripper("pandas/support_link", "goal/gripper2",
-    [1.05, 0.5, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
+    [1.05, 0.05, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
 ps.client.manipulation.robot.addHandle("part/base_link", "part/center1",
     [0,0,0,0,sqrt(2)/2,0,sqrt(2)/2], 0.03, 3*[True] + [False, True, True])
 ps.client.manipulation.robot.addHandle("part/base_link", "part/center2",
@@ -137,14 +143,6 @@ q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
       0, 0, 1.2, 0, 0, 0, 1,
       0, 0, 0.761, 0, 0, 0, 1]
 
-if connectedToRos:
-    ri = RosInterface(robot)
-    q = ri.getCurrentConfig(q0)
-    res, q, err = binPicking.graph.applyNodeConstraints('free', q)
-    assert(res)
-else:
-    q = q0[:]
-
 # Create effector
 print("Building effector.")
 binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
@@ -152,15 +150,52 @@ binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
 print("Generating goal configurations.")
 binPicking.generateGoalConfigs(q0)
 
-for i in range(10):
-    found = False
-    while not found:
-        q_init = shootPartInBox(robot, q)
-        found, msg = robot.isConfigValid(q_init)
-    print("Solving")
-    res = False
-    res, p = binPicking.solve(q_init)
-    if res:
-        ps.client.basic.problem.addPath(p)
+
+def GrabAndDrop(robot, ps, binPicking):
+    # Get configuration of the robot
+    ri = None
+
+    if connectedToRos:
+        ri = RosInterface(robot)
+        q_init = ri.getCurrentConfig(q0)
+        res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+        assert(res)
     else:
-        print(p)
+        q_init = q0[:]
+
+    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
+
+    # Detecting the object poses
+    found = False
+    essaie = 0
+    q_init = ri.getObjectPose(q_init)
+    print(q_init)
+
+    while not found and essaie < 25:
+        found, msg = robot.isConfigValid(q_init)
+        essaie += 1
+
+    # Resolving the path to the object
+    if found:
+        print("[INFO] Solution found")
+        print("Solving ...")
+        res = False
+        res, p = binPicking.solve(q_init)
+        if res:
+            ps.client.basic.problem.addPath(p)
+        else:
+            print(p)
+
+    else:
+        print("[INFO] Solution not found")
+        print("Trying solving without playing path for simulation ...")
+        res = False
+        res, p = binPicking.solve(q_init)
+        if res:
+            ps.client.basic.problem.addPath(p)
+        else:
+            print(p)
+    return q_init, p
+
+if __name__ == '__main__':
+    q_init, p = GrabAndDrop(robot, ps, binPicking)
