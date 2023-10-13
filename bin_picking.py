@@ -219,6 +219,7 @@ class BinPicking(object):
         self.transitionPlanner = self.wd(self.ps.client.manipulation.problem.\
                                       createTransitionPlanner())
         self.transitionPlanner.timeOut(3.)
+        self.transitionPlanner.setPathProjector('Progressive', 0.2)
         self.transitionPlanner.addPathOptimizer("EnforceTransitionSemantic")
         self.transitionPlanner.addPathOptimizer("SimpleTimeParameterization")
         self.transitionPlanner.setParameter('SimpleTimeParameterization/order',
