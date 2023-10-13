@@ -113,13 +113,25 @@ class RosInterface(Parent):
         self.tfBuffer = tf2_ros.Buffer()
         self.listener = tf2_ros.TransformListener(self.tfBuffer)
         qres = q0[:]
-        objectFrame = 'object_tless_1_1'
+
+        found  = False
+
+        objectFrame_1 = 'object_tless_1_1'
+        objectFrame_2 = 'object_tless_2_1'
 
         print("[INFO] Poses not published yet. Waiting for pose to be published.")
         print("[INFO] You need to launch the 'happypose_inference' service.")
         print("...")
-
-        while not self.tfBuffer.can_transform(cameraFrame, objectFrame, rospy.Time()):
+        
+        while not found:
+            if self.tfBuffer.can_transform(cameraFrame, objectFrame_1, rospy.Time()):
+                obj_found = objectFrame_1
+                found = True
+                print("Object Tless 1 found.")
+            if self.tfBuffer.can_transform(cameraFrame, objectFrame_2, rospy.Time()):
+                obj_found = objectFrame_2
+                found = True
+                print("Object Tless 2 found.")
             rospy.sleep(0.01)
         
         print("[INFO] Pose found !")
@@ -127,7 +139,7 @@ class RosInterface(Parent):
         wMc = XYZQUATToSE3(self.robot.hppcorba.robot.getJointsPosition(q0, [self.robotPrefix + cameraFrame])[0])
         print(f"wMc = {wMc}")
         try:
-            _cMo = self.tfBuffer.lookup_transform(cameraFrame, objectFrame, rospy.Time(), rospy.Duration(timeout))
+            _cMo = self.tfBuffer.lookup_transform(cameraFrame, obj_found, rospy.Time(), rospy.Duration(timeout))
             _cMo = _cMo.transform
             # renormalize quaternion
             x = _cMo.rotation.x

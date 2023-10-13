@@ -169,7 +169,7 @@ def GrabAndDrop(robot, ps, binPicking):
     found = False
     essaie = 0
     q_init = ri.getObjectPose(q_init)
-    print(q_init)
+    print("\nPose of the object : \n",q_init,"\n")
 
     while not found and essaie < 25:
         found, msg = robot.isConfigValid(q_init)
