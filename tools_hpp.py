@@ -84,6 +84,7 @@ def displayGripper(viewer, name):
 
 def generateTargetConfig(robot, graph, edge, q, Nsamples = 50):
     res = False
+    minErr = 1e8
     for i in range(Nsamples + 1):
         if i == 0:
             qrand = q[:]
@@ -92,13 +93,16 @@ def generateTargetConfig(robot, graph, edge, q, Nsamples = 50):
             r = robot.rankInConfiguration['box/root_joint']
             qrand[r:r+7] = q[r:r+7]
         res, q1, err = graph.generateTargetConfig(edge, q, qrand)
+        if err < minErr:
+            minErr = err
+            best_q = q1[:]
         if not res: continue
         res, msg = robot.isConfigValid(q1)
         if res: break
     if res:
         return True, q1
     else:
-        return False, q
+        return False, best_q
 
 class RosInterface(Parent):
     def getObjectPose(self, q0, timeout=5):
