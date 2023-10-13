@@ -1,4 +1,4 @@
-\# Pose of ref_camera_link in hand
+# Pose of ref_camera_link in hand
 camera:
   x: 0.03066786656311201
   y: 0.0002916853387606305
