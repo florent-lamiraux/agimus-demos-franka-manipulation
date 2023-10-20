@@ -37,6 +37,42 @@ from bin_picking import BinPicking
 
 import rospy
 import sys
+import os
+import numpy as np
+import cv2
+<<<<<<< Updated upstream
+import torch
+from scipy.spatial.transform import Rotation as R
+from sensor_msgs.msg import Image, CameraInfo
+from cv_bridge import CvBridge
+from PIL import Image as img_PIL
+from pathlib import Path
+from bokeh.io import export_png
+from bokeh.plotting import gridplot
+
+from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
+from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
+from happypose.toolbox.lib3d.transform import Transform
+from happypose.toolbox.renderer import Panda3dLightData
+from happypose.toolbox.renderer.panda3d_scene_renderer import Panda3dSceneRenderer
+from happypose.toolbox.utils.conversion import convert_scene_observation_to_panda3d
+from happypose.toolbox.visualization.bokeh_plotter import BokehPlotter
+from happypose.toolbox.visualization.utils import make_contour_overlay
+from happypose.toolbox.utils.logging import get_logger, set_logging_level
+
+logger = get_logger(__name__)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["EGL_VISIBLE_DEVICES"] = "-1"
+=======
+from scipy.spatial.transform import Rotation as R
+from sensor_msgs.msg import Image, CameraInfo
+from cv_bridge import CvBridge
+from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
+from pathlib import Path
+>>>>>>> Stashed changes
 
 print("[START]")
 print("To avoid crash during constrain graph building, kill the hppcorbaserver process once in a while.")
@@ -150,6 +186,111 @@ binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
 print("Generating goal configurations.")
 binPicking.generateGoalConfigs(q0)
 
+def render_detection():
+    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
+    example_dir = Path(data_dir) / "examples/tless"
+    rgb = np.array(Image.open("camera_view.png"), dtype=np.uint8)
+    camera_data = CameraData.from_json((example_dir / "camera_data.json").read_text())
+    camera_data.resolution = rgb.shape[:2]
+
+#___________________from_run_inference_on_exemple_COSYPOSE___________________
+
+def make_object_dataset(example_dir: Path) -> RigidObjectDataset:
+    rigid_objects = []
+    mesh_units = "mm"
+    object_dirs = (example_dir / "meshes").iterdir()
+    print(object_dirs)
+    for object_dir in object_dirs:
+        label = object_dir.name
+        mesh_path = None
+        for fn in object_dir.glob("*"):
+            if fn.suffix in {".obj", ".ply"}:
+                assert not mesh_path, f"there multiple meshes in the {label} directory"
+                mesh_path = fn
+        assert mesh_path, f"couldnt find a obj or ply mesh for {label}"
+        rigid_objects.append(RigidObject(label=label, mesh_path=mesh_path, mesh_units=mesh_units))
+        # TODO: fix mesh units
+    rigid_object_dataset = RigidObjectDataset(rigid_objects)
+    return rigid_object_dataset
+
+
+def rendering(poses):
+    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
+    example_dir = Path(data_dir) / "examples/tless"
+
+    rgb = np.array(img_PIL.open("camera_view.png"), dtype=np.uint8)
+    camera_data = CameraData.from_json((example_dir / "camera_data.json").read_text())
+    camera_data.resolution = rgb.shape[:2]
+
+    object_dataset = make_object_dataset(example_dir)
+    camera_data.TWC = Transform(np.eye(4))
+    renderer = Panda3dSceneRenderer(object_dataset)
+    # Data necessary for image rendering
+    print(type(poses[0]))
+    print(type(poses[0].numpy()))
+    print(len(poses))
+    print("poses[0].shape : ", poses[0].shape)
+    print("poses.size() : ", poses.size())
+    print("poses[0].size() : ", poses[0].size())
+    object_datas = [ObjectData(label="tless", TWO=Transform(poses[0].numpy()))]
+    camera_data, object_datas = convert_scene_observation_to_panda3d(camera_data, object_datas)
+    light_datas = [
+        Panda3dLightData(
+            light_type="ambient",
+            color=((0.6, 0.6, 0.6, 1)),
+        ),
+    ]
+    renderings = renderer.render_scene(
+        object_datas,
+        [camera_data],
+        light_datas,
+        render_depth=False,
+        render_binary_mask=False,
+        render_normals=False,
+        copy_arrays=True,
+    )[0]
+    return renderings
+
+def save_predictions(renderings):
+    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
+    example_dir = Path(data_dir) / "examples/tless"
+    rgb_render = renderings.rgb
+    rgb = np.array(img_PIL.open("camera_view.png"), dtype=np.uint8)
+    # render_prediction_wrt_camera calls BulletSceneRenderer.render_scene using only one camera at pose Identity and return only rgb values
+    # BulletSceneRenderer.render_scene: gets a "object list" (prediction like object), a list of camera infos (with Km pose, res) and renders
+    # a "camera observation" for each camera/viewpoint
+    # Actually, renders: rgb, mask, depth, near, far
+    #rgb_render = render_prediction_wrt_camera(renderer, preds, cam)
+    mask = ~(rgb_render.sum(axis=-1) == 0)
+    alpha = 0.1
+    rgb_n_render = rgb.copy()
+    rgb_n_render[mask] = rgb_render[mask]
+
+    print("save prediction")
+
+    # make the image background a bit fairer than the render
+    rgb_overlay = np.zeros_like(rgb_render)
+    rgb_overlay[~mask] = rgb[~mask] * 0.6 + 255 * 0.4
+    rgb_overlay[mask] = rgb_render[mask] * 0.8 + 255 * 0.2
+    plotter = BokehPlotter()
+
+    fig_rgb = plotter.plot_image(rgb)
+
+    fig_mesh_overlay = plotter.plot_overlay(rgb, renderings.rgb)
+    contour_overlay = make_contour_overlay(
+        rgb, renderings.rgb, dilate_iterations=1, color=(0, 255, 0)
+    )["img"]
+    fig_contour_overlay = plotter.plot_image(contour_overlay)
+    fig_all = gridplot([[fig_rgb, fig_contour_overlay, fig_mesh_overlay]], toolbar_location=None)
+    vis_dir = example_dir / "visualizations_hpp"
+    vis_dir.mkdir(exist_ok=True)
+    export_png(fig_mesh_overlay, filename=vis_dir / "mesh_overlay.png")
+    export_png(fig_contour_overlay, filename=vis_dir / "contour_overlay.png")
+    export_png(fig_all, filename=vis_dir / "all_results.png")
+    print("Images save in : ",vis_dir)
+
+
+#___________________END_COSYPOSE___________________
 
 def GrabAndDrop(robot, ps, binPicking):
     # Get configuration of the robot
@@ -169,7 +310,35 @@ def GrabAndDrop(robot, ps, binPicking):
     found = False
     essaie = 0
     q_init = ri.getObjectPose(q_init)
-    print("\nPose of the object : \n",q_init,"\n")
+    poses = np.array(q_init[9:16])
+    rotation_matrix = R.as_matrix(R.from_quat(poses[0:4]))
+    transformation_matrix = np.zeros((4,4))
+    transformation_matrix[:3,:3] = rotation_matrix
+    transformation_matrix[:3,3] = poses[4:7]
+    transformation_matrix[3,3] = 1
+
+    image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
+    bridge = CvBridge()
+    image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
+    cv2.imwrite("camera_view.png", image)
+
+    print("\nPose of the object : \n",poses,"\n")
+    print("\n Transformation matrix : \n",transformation_matrix,"\n")
+<<<<<<< Updated upstream
+
+
+    print("Rendering the detection on image ...")
+
+    render = True
+
+    if render:
+        transformation_matrix = torch.tensor([transformation_matrix])
+        renderings = rendering(transformation_matrix)
+        save_predictions(renderings)
+        print("Render finished !")
+
+=======
+>>>>>>> Stashed changes
 
     while not found and essaie < 25:
         found, msg = robot.isConfigValid(q_init)
@@ -183,6 +352,7 @@ def GrabAndDrop(robot, ps, binPicking):
         res, p = binPicking.solve(q_init)
         if res:
             ps.client.basic.problem.addPath(p)
+            print("Path generated.")
         else:
             print(p)
 
