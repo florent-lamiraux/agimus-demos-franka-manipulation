@@ -40,7 +40,6 @@ import sys
 import os
 import numpy as np
 import cv2
-<<<<<<< Updated upstream
 import torch
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Image, CameraInfo
@@ -66,13 +65,6 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ["EGL_VISIBLE_DEVICES"] = "-1"
-=======
-from scipy.spatial.transform import Rotation as R
-from sensor_msgs.msg import Image, CameraInfo
-from cv_bridge import CvBridge
-from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
-from pathlib import Path
->>>>>>> Stashed changes
 
 print("[START]")
 print("To avoid crash during constrain graph building, kill the hppcorbaserver process once in a while.")
@@ -185,13 +177,6 @@ binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
 
 print("Generating goal configurations.")
 binPicking.generateGoalConfigs(q0)
-
-def render_detection():
-    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
-    example_dir = Path(data_dir) / "examples/tless"
-    rgb = np.array(Image.open("camera_view.png"), dtype=np.uint8)
-    camera_data = CameraData.from_json((example_dir / "camera_data.json").read_text())
-    camera_data.resolution = rgb.shape[:2]
 
 #___________________from_run_inference_on_exemple_COSYPOSE___________________
 
@@ -324,8 +309,6 @@ def GrabAndDrop(robot, ps, binPicking):
 
     print("\nPose of the object : \n",poses,"\n")
     print("\n Transformation matrix : \n",transformation_matrix,"\n")
-<<<<<<< Updated upstream
-
 
     print("Rendering the detection on image ...")
 
@@ -336,9 +319,6 @@ def GrabAndDrop(robot, ps, binPicking):
         renderings = rendering(transformation_matrix)
         save_predictions(renderings)
         print("Render finished !")
-
-=======
->>>>>>> Stashed changes
 
     while not found and essaie < 25:
         found, msg = robot.isConfigValid(q_init)
