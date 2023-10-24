@@ -29,10 +29,8 @@ from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
 
 if __name__ == '__main__':
     import rospy
-    cc = CalibrationControl ()
-    cc.endEffectorFrame = "panda2_ref_camera_link"
-    cc.mountFrame = "panda2_hand"
-    cc.cameraFrame = "camera_color_optical_frame"
+    cc = CalibrationControl("panda2_hand", "camera_color_optical_frame",
+    "panda2_ref_camera_link")
     cc.squareSize = 0.0254
     cc.joints = ['panda2_joint1', 'panda2_joint2', 'panda2_joint3',
         'panda2_joint4', 'panda2_joint5', 'panda2_joint6',
