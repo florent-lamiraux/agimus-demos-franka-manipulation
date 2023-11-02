@@ -158,7 +158,8 @@ class RosInterface(Parent):
         print(f"cMo = {cMo}")
         rk = self.robot.rankInConfiguration['part/root_joint']
         assert self.robot.getJointConfigSize('part/root_joint') == 7
+        wMo = wMc * cMo
         print(f"wMo = {wMc * cMo}")
         qres[rk:rk+7] = SE3ToXYZQUAT (wMc * cMo)
             
-        return qres
+        return qres, wMo

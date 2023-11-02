@@ -277,7 +277,7 @@ def save_predictions(renderings):
 
 #___________________END_COSYPOSE___________________
 
-def GrabAndDrop(robot, ps, binPicking):
+def GrabAndDrop(robot, ps, binPicking, render):
     # Get configuration of the robot
     ri = None
 
@@ -294,11 +294,12 @@ def GrabAndDrop(robot, ps, binPicking):
     # Detecting the object poses
     found = False
     essaie = 0
-    q_init = ri.getObjectPose(q_init)
+    q_init, wMo = ri.getObjectPose(q_init)
     poses = np.array(q_init[9:16])
-    rotation_matrix = R.as_matrix(R.from_quat(poses[0:4]))
+    # rotation_matrix = R.as_matrix(R.from_quat(poses[0:4]))
+    rotation_matrix = np.array(wMo)
     transformation_matrix = np.zeros((4,4))
-    transformation_matrix[:3,:3] = rotation_matrix
+    transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
     transformation_matrix[:3,3] = poses[4:7]
     transformation_matrix[3,3] = 1
 
@@ -310,11 +311,10 @@ def GrabAndDrop(robot, ps, binPicking):
     print("\nPose of the object : \n",poses,"\n")
     print("\n Transformation matrix : \n",transformation_matrix,"\n")
 
-    print("Rendering the detection on image ...")
-
-    render = True
+    
 
     if render:
+        print("Rendering the detection on image ...")
         transformation_matrix = torch.tensor([transformation_matrix])
         renderings = rendering(transformation_matrix)
         save_predictions(renderings)
@@ -326,7 +326,7 @@ def GrabAndDrop(robot, ps, binPicking):
 
     # Resolving the path to the object
     if found:
-        print("[INFO] Solution found")
+        print("[INFO] Object found with no collision")
         print("Solving ...")
         res = False
         res, p = binPicking.solve(q_init)
@@ -337,7 +337,7 @@ def GrabAndDrop(robot, ps, binPicking):
             print(p)
 
     else:
-        print("[INFO] Solution not found")
+        print("[INFO] Object found but not collision free")
         print("Trying solving without playing path for simulation ...")
         res = False
         res, p = binPicking.solve(q_init)
@@ -348,4 +348,5 @@ def GrabAndDrop(robot, ps, binPicking):
     return q_init, p
 
 if __name__ == '__main__':
-    q_init, p = GrabAndDrop(robot, ps, binPicking)
+    render = False # default value
+    q_init, p = GrabAndDrop(robot, ps, binPicking, render)
