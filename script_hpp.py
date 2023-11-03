@@ -48,6 +48,7 @@ from PIL import Image as img_PIL
 from pathlib import Path
 from bokeh.io import export_png
 from bokeh.plotting import gridplot
+from happy_service_call import service_call
 
 from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
 from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
@@ -346,6 +347,18 @@ def GrabAndDrop(robot, ps, binPicking, render):
         else:
             print(p)
     return q_init, p
+
+def devraqueur():
+    print("Debut du devracage.")
+    print("[INFO] You need to launch the 'happypose_inference' service.")
+    print("...")
+    nb_obj = service_call()
+    print(nb_obj)
+    for i in range(nb_obj):
+        print("Poses : ")
+        render = False
+        q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+
 
 if __name__ == '__main__':
     render = False # default value
