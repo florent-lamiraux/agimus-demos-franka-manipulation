@@ -176,7 +176,7 @@
         <child link="wall_link_3"/>
       </joint>
       <joint name="pedestal_joint" type="fixed">
-        <origin xyz="1.05 0.45 0"/>
+        <origin xyz="1.05 0 0"/>
         <parent link="world"/>
         <child link="pedestal"/>
       </joint>

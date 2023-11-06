@@ -348,8 +348,8 @@ def GrabAndDrop(robot, ps, binPicking, render):
             print(p)
     return q_init, p
 
-def devraqueur():
-    print("Debut du devracage.")
+def multiple_GrabAndDrop():
+    print("Begining of bin picking.")
     print("[INFO] You need to launch the 'happypose_inference' service.")
     print("...")
     nb_obj = service_call()
