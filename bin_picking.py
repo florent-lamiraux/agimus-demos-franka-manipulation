@@ -225,7 +225,7 @@ class BinPicking(object):
         self.transitionPlanner.setParameter('SimpleTimeParameterization/order',
                                          convertToAny(2))
         self.transitionPlanner.setParameter(
-            'SimpleTimeParameterization/maxAcceleration', convertToAny(2.))
+            'SimpleTimeParameterization/maxAcceleration', convertToAny(1.))
         self.transitionPlanner.setParameter(
             'SimpleTimeParameterization/safety', convertToAny(.95))
     def buildEffectors(self, obstacles, q):

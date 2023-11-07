@@ -124,20 +124,19 @@ class RosInterface(Parent):
         print("...")
         
         while not found:
-            if self.tfBuffer.can_transform(cameraFrame, objectFrame_1, rospy.Time()):
-                obj_found = objectFrame_1
-                found = True
-                print("Object Tless 1 found.")
             if self.tfBuffer.can_transform(cameraFrame, objectFrame_2, rospy.Time()):
                 obj_found = objectFrame_2
                 found = True
                 print("Object Tless 2 found.")
+            if self.tfBuffer.can_transform(cameraFrame, objectFrame_1, rospy.Time()):
+                obj_found = objectFrame_1
+                found = True
+                print("Object Tless 1 found.")
             rospy.sleep(0.01)
         
         print("[INFO] Pose found !")
         print("... Starting calculating transform in the camera frame land mark ...")
         wMc = XYZQUATToSE3(self.robot.hppcorba.robot.getJointsPosition(q0, [self.robotPrefix + cameraFrame])[0])
-        print(f"wMc = {wMc}")
         try:
             _cMo = self.tfBuffer.lookup_transform(cameraFrame, obj_found, rospy.Time(), rospy.Duration(timeout))
             _cMo = _cMo.transform
@@ -155,11 +154,9 @@ class RosInterface(Parent):
                             _cMo.translation.z, _cMo.rotation.x/n,
                             _cMo.rotation.y/n, _cMo.rotation.z/n,
                             _cMo.rotation.w/n])
-        print(f"cMo = {cMo}")
         rk = self.robot.rankInConfiguration['part/root_joint']
         assert self.robot.getJointConfigSize('part/root_joint') == 7
         wMo = wMc * cMo
-        print(f"wMo = {wMc * cMo}")
         qres[rk:rk+7] = SE3ToXYZQUAT (wMc * cMo)
             
         return qres, wMo
