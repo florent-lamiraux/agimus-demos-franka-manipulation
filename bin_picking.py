@@ -109,10 +109,6 @@ class BinPicking(object):
     Configuration with which goal configurations are precomputed.
     This configuration defines the poses of objects other than the part.
     """
-    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1, 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.75, 'safety' : 0.95}}
-    """
-    Configuration of end effector for freefly or grasp.
-    """
 
     def wd(self, o):
         return wrap_delete(o, self.ps.client.basic._tools)
@@ -307,16 +303,62 @@ class BinPicking(object):
                     if not res: continue
                     ggIndex = self.factory.grippers.index(goalGripper)
                     ghIndex = self.factory.handles.index(goalHandle)
-                    edge = f"{robotGripper} < {handle} | {irg}-{ih}:" + \
-                        f"{ggIndex}-{ghIndex}_21"
-                    if not edge in self.graph.edges.keys(): breakpoint()
-                    res, q3 = generateTargetConfig(self.robot, self.graph,
-                                                   edge, q2)
-                    self.goalConfigs["pregrasp"][robotGripper][handle] = q1
-                    self.goalConfigs["grasp"][robotGripper][handle] = q2
-                    self.goalConfigs["preplace"][robotGripper][handle] = q3
-                    self.goalGrasps[robotGripper][handle] = igg
-                    if res: break
+                    edges = [f"{goalGripper} > {goalHandle} | {irg}-{ih}_01",
+                             f"{goalGripper} > {goalHandle} | {irg}-{ih}_12",
+                             f"{robotGripper} < {handle} | {irg}-{ih}:" + \
+                             f"{ggIndex}-{ghIndex}_21"]
+                    p = self.generateConsecutivePaths(edges, q)
+                    if p:
+                        self.placePaths[robotGripper][handle] = p
+
+                        break
+
+    def generateConsecutivePaths(self, edges, q, Nsamples = 50):
+        """
+        Generate consecutive paths along a list of edges
+
+        The paths starts along the second edge. The first edge is used
+        to generate the initial configuration of the path.
+        The constraint right hand sides are initialized with
+          - the input configuration q for the first edge,
+          - the end of the previous path for the following edges
+        """
+        for i in range(Nsamples + 1):
+            if i == 0:
+                qrand = q[:]
+            else:
+                qrand = self.robot.shootRandomConfig()
+                r = self.robot.rankInConfiguration['box/root_joint']
+                qrand[r:r+7] = q[r:r+7]
+            waypoints = list()
+            success = True
+            for edge in edges:
+                q1 = generateTargetConfig(self.robot, self.graph,
+                                          edge, q, qrand)
+                if not q1:
+                    success = False
+                    break
+                waypoints.append(q1)
+                q = q1[:]; qrand = q1[:]
+            # If the waypoints have been successfully generated, we
+            # plan paths between them
+            paths = list()
+            if success:
+                for q1, q2, edge in zip(waypoints, waypoints[1:], edges[1:]):
+                    self.transitionPlanner.setEdge(self.graph.edges[edge])
+                    self.setParam('grasping')
+                    p, res, msg = self.transitionPlanner.directPath(q1, q2,
+                                                                    True)
+                    if not res:
+                        success = False
+                        break
+                    else:
+                        p = self.wd(p)
+                        p = self.transitionPlanner.timeParameterization(p.asVector())
+                        paths.append(self.wd(p))
+            if success:
+                return concatenatePaths(paths)
+        return None
 
     def checkObjectPoses(self, q):
         """
@@ -399,7 +441,10 @@ class BinPicking(object):
         return 8*(None,)
 
     def setParam(self, state):
-        # timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1, 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.75, 'safety' : 0.95}}
+        timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1., 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.5, 'safety' : 0.95}}
+        """
+        Configuration of end effector for freefly or grasp.
+        """
         if state == 'freefly':
             self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict['freefly']['order']))
             self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict['freefly']['maxAcc']))
@@ -424,6 +469,7 @@ class BinPicking(object):
             msg = "Failed to generate collision-free grasp with valid goal " +\
                 "configurations"
             return False, msg
+        
         # Plan paths between waypoint configurations
         edge = "Loop | f"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
@@ -433,54 +479,21 @@ class BinPicking(object):
         except Exception as exc:
             raise RuntimeError(f"Failed to connect {q} and {q1}: {exc}")
         
-        edge = f"{gripper} > {handle} | f_12"
-        self.transitionPlanner.setEdge(self.graph.edges[edge])
-        self.setParam('grasping')
-        p2, res, msg = self.transitionPlanner.directPath(q1, q2, False)
-        assert(res)
-        p2 = self.transitionPlanner.timeParameterization(p2.asVector())
-
-        edge = f"{gripper} > {handle} | f_23"
-        self.transitionPlanner.setEdge(self.graph.edges[edge])
-        self.setParam('freefly')
-        p3, res, msg = self.transitionPlanner.directPath(q2, q3, False)
-        assert(res)
-        p3 = self.transitionPlanner.timeParameterization(p3.asVector())
-
         ig = self.factory.grippers.index(gripper)
         ih = self.factory.handles.index(handle)
         edge = f"Loop | {ig}-{ih}"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
-        self.setParam('freefly')
+        self.setParam('grasping')
         try:
             p4 = self.transitionPlanner.planPath(q3, [q4,], True)
         except Exception as exc:
             raise RuntimeError(f"Failed to connect {q3} and {q4}: {exc}")
         
-        igg = self.goalGrasps[gripper][handle]
-        ng = len(self.robotGrippers); nh = len(self.handles)
-        goalGripper = self.goalGrippers[igg]
-        goalHandle = self.goalHandles[igg]
-        edge = f"{goalGripper} > {goalHandle} | {ig}-{ih}_12"
-        self.transitionPlanner.setEdge(self.graph.edges[edge])
-        self.setParam('grasping')
-        p5, res, msg = self.transitionPlanner.directPath(q4, q5, False)
-        assert(res)
-        p5 = self.transitionPlanner.timeParameterization(p5.asVector())
-
-        ggIndex = self.factory.grippers.index(goalGripper)
-        ghIndex = self.factory.handles.index(goalHandle)
-        edge = f"{gripper} < {handle} | {ig}-{ih}:{ggIndex}-{ghIndex}_21"
-        self.transitionPlanner.setEdge(self.graph.edges[edge])
-        self.setParam('freefly')
-        p6, res, msg = self.transitionPlanner.directPath(q5, q6, False)
-        assert(res)
-        p6 = self.transitionPlanner.timeParameterization(p6.asVector())
-
+        # Return to initial configuration
         edge = "Loop | f"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
         self.setParam('freefly')
-        # Return to initial configuration
+        q6 = placePath.end()
         q7 = q[:]
         r = self.robot.rankInConfiguration[f"{self.objects[0]}/root_joint"]
         q7[r:r+7] = q6[r:r+7]
