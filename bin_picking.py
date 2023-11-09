@@ -445,14 +445,11 @@ class BinPicking(object):
         """
         Configuration of end effector for freefly or grasp.
         """
-        if state == 'freefly':
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict['freefly']['order']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict['freefly']['maxAcc']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(timeParamDict['freefly']['safety']))
-        if state == 'grasping':
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict['grasping']['order']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict['grasping']['maxAcc']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(timeParamDict['grasping']['safety']))
+        if state not in self.timeParamDict:
+            raise RuntimeError(f"state value should belong to {list(self.timeParamDict.keys())}"
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict[state]['order']))
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict[state]['maxAcc']))
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(timeParamDict['freefly'][state]))
 
     def solve(self, q):
         """
