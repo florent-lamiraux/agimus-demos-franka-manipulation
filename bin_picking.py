@@ -109,6 +109,11 @@ class BinPicking(object):
     Configuration with which goal configurations are precomputed.
     This configuration defines the poses of objects other than the part.
     """
+    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1, 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.75, 'safety' : 0.95}}
+    """
+    Configuration of end effector for freefly or grasp.
+    """
+
     def wd(self, o):
         return wrap_delete(o, self.ps.client.basic._tools)
 
@@ -222,12 +227,10 @@ class BinPicking(object):
         self.transitionPlanner.setPathProjector('Progressive', 0.2)
         self.transitionPlanner.addPathOptimizer("EnforceTransitionSemantic")
         self.transitionPlanner.addPathOptimizer("SimpleTimeParameterization")
-        self.transitionPlanner.setParameter('SimpleTimeParameterization/order',
-                                         convertToAny(2))
-        self.transitionPlanner.setParameter(
-            'SimpleTimeParameterization/maxAcceleration', convertToAny(1.))
-        self.transitionPlanner.setParameter(
-            'SimpleTimeParameterization/safety', convertToAny(.95))
+        # self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(2))
+        # self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(1.))
+        # self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(.95))
+
     def buildEffectors(self, obstacles, q):
         """
         build and effector to test collision of grasps
@@ -395,6 +398,16 @@ class BinPicking(object):
                     return (gripper, handle, q1, q2, q3, q4, q5, q6)
         return 8*(None,)
 
+    def setParam(self, state):
+        # timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1, 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.75, 'safety' : 0.95}}
+        if state == 'freefly':
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict['freefly']['order']))
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict['freefly']['maxAcc']))
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(timeParamDict['freefly']['safety']))
+        if state == 'grasping':
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(timeParamDict['grasping']['order']))
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(timeParamDict['grasping']['maxAcc']))
+            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(timeParamDict['grasping']['safety']))
 
     def solve(self, q):
         """
@@ -414,46 +427,59 @@ class BinPicking(object):
         # Plan paths between waypoint configurations
         edge = "Loop | f"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('freefly')
         try:
             p1 = self.transitionPlanner.planPath(q, [q1,], True)
         except Exception as exc:
             raise RuntimeError(f"Failed to connect {q} and {q1}: {exc}")
+        
         edge = f"{gripper} > {handle} | f_12"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('grasping')
         p2, res, msg = self.transitionPlanner.directPath(q1, q2, False)
         assert(res)
         p2 = self.transitionPlanner.timeParameterization(p2.asVector())
+
         edge = f"{gripper} > {handle} | f_23"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('freefly')
         p3, res, msg = self.transitionPlanner.directPath(q2, q3, False)
         assert(res)
         p3 = self.transitionPlanner.timeParameterization(p3.asVector())
+
         ig = self.factory.grippers.index(gripper)
         ih = self.factory.handles.index(handle)
         edge = f"Loop | {ig}-{ih}"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('freefly')
         try:
             p4 = self.transitionPlanner.planPath(q3, [q4,], True)
         except Exception as exc:
             raise RuntimeError(f"Failed to connect {q3} and {q4}: {exc}")
+        
         igg = self.goalGrasps[gripper][handle]
         ng = len(self.robotGrippers); nh = len(self.handles)
         goalGripper = self.goalGrippers[igg]
         goalHandle = self.goalHandles[igg]
         edge = f"{goalGripper} > {goalHandle} | {ig}-{ih}_12"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('grasping')
         p5, res, msg = self.transitionPlanner.directPath(q4, q5, False)
         assert(res)
         p5 = self.transitionPlanner.timeParameterization(p5.asVector())
+
         ggIndex = self.factory.grippers.index(goalGripper)
         ghIndex = self.factory.handles.index(goalHandle)
         edge = f"{gripper} < {handle} | {ig}-{ih}:{ggIndex}-{ghIndex}_21"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('freefly')
         p6, res, msg = self.transitionPlanner.directPath(q5, q6, False)
         assert(res)
         p6 = self.transitionPlanner.timeParameterization(p6.asVector())
+
         edge = "Loop | f"
         self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('freefly')
         # Return to initial configuration
         q7 = q[:]
         r = self.robot.rankInConfiguration[f"{self.objects[0]}/root_joint"]
