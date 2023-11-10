@@ -259,7 +259,7 @@ def save_predictions(renderings):
     rgb_overlay[~mask] = rgb[~mask] * 0.6 + 255 * 0.4
     rgb_overlay[mask] = rgb_render[mask] * 0.8 + 255 * 0.2
     plotter = BokehPlotter()
-    
+
     fig_rgb = plotter.plot_image(rgb)
 
     fig_mesh_overlay = plotter.plot_overlay(rgb, renderings.rgb)
