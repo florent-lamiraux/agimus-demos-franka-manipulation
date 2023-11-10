@@ -78,31 +78,15 @@ def displayGripper(viewer, name):
         viewer.client.gui.addToGroup(gname, robot.name)
     viewer.client.gui.applyConfiguration(gname, pose)
 
-# Generate target config from randomly sampled configurations
-# Default Nsample = 20
-# len(binPicking.goalConfigs['preplace']['pandas/panda2_gripper'].keys())
-
-def generateTargetConfig(robot, graph, edge, q, Nsamples = 50):
-    res = False
-    minErr = 1e8
-    for i in range(Nsamples + 1):
-        if i == 0:
-            qrand = q[:]
-        else:
-            qrand = robot.shootRandomConfig()
-            r = robot.rankInConfiguration['box/root_joint']
-            qrand[r:r+7] = q[r:r+7]
-        res, q1, err = graph.generateTargetConfig(edge, q, qrand)
-        if err < minErr:
-            minErr = err
-            best_q = q1[:]
-        if not res: continue
-        res, msg = robot.isConfigValid(q1)
-        if res: break
+# Generate target config from two configurations
+def generateTargetConfig(robot, graph, edge, qLeaf, qRand):
+    res, q1, err = graph.generateTargetConfig(edge, qLeaf, qRand)
+    if not res: return None
+    res, msg = robot.isConfigValid(q1)
     if res:
-        return True, q1
+        return q1
     else:
-        return False, best_q
+        return None
 
 class RosInterface(Parent):
     def getObjectPose(self, q0, timeout=5):
