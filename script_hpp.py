@@ -296,18 +296,18 @@ def GrabAndDrop(robot, ps, binPicking, render):
     found = False
     essaie = 0
     q_init, wMo = ri.getObjectPose(q_init)
+
     poses = np.array(q_init[9:16])
-    # rotation_matrix = R.as_matrix(R.from_quat(poses[0:4]))
     rotation_matrix = np.array(wMo)
     transformation_matrix = np.zeros((4,4))
     transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
     transformation_matrix[:3,3] = poses[4:7]
     transformation_matrix[3,3] = 1
 
-    image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
-    bridge = CvBridge()
-    image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
-    cv2.imwrite("camera_view.png", image)
+    # image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
+    # bridge = CvBridge()
+    # image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
+    # cv2.imwrite("camera_view.png", image)
 
     print("\nPose of the object : \n",poses,"\n")
     # print("\n Transformation matrix : \n",transformation_matrix,"\n")
@@ -341,6 +341,8 @@ def GrabAndDrop(robot, ps, binPicking, render):
 
     return q_init, None
 
+    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
+
 def multiple_GrabAndDrop():
     print("Begining of bin picking.")
     print("[INFO] You need to launch the 'happypose_inference' service.")
@@ -351,6 +353,14 @@ def multiple_GrabAndDrop():
         print("Poses : ")
         render = False
         q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+
+def precise_Grasp():
+    print("Begining of precise grasp.")
+    print("[INFO] You need to launch the 'happypose_inference' service.")
+    print("...")
+
+
+    return 0
 
 
 if __name__ == '__main__':

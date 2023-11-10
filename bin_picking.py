@@ -109,7 +109,7 @@ class BinPicking(object):
     Configuration with which goal configurations are precomputed.
     This configuration defines the poses of objects other than the part.
     """
-    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1., 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.5, 'safety' : 0.95}}
+    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1., 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.1, 'safety' : 0.95}}
     """
     Configuration of end effector for freefly or grasp.
     """
