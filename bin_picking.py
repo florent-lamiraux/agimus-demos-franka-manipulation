@@ -318,11 +318,15 @@ class BinPicking(object):
             if success:
                 for q1, q2, edge in zip(waypoints, waypoints[1:], edges[1:]):
                     self.transitionPlanner.setEdge(self.graph.edges[edge])
-                    p, res, msg = self.transitionPlanner.directPath(q1, q2, True)
+                    self.setParam('grasping')
+                    p, res, msg = self.transitionPlanner.directPath(q1, q2,
+                                                                    True)
                     if not res:
                         success = False
                         break
                     else:
+                        p = self.wd(p)
+                        p = self.transitionPlanner.timeParameterization(p.asVector())
                         paths.append(self.wd(p))
             if success:
                 return concatenatePaths(paths)
@@ -403,14 +407,11 @@ class BinPicking(object):
 
 
     def setParam(self, state):
-        if state == 'freefly':
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(self.timeParamDict['freefly']['order']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict['freefly']['maxAcc']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict['freefly']['safety']))
-        if state == 'grasping':
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(self.timeParamDict['grasping']['order']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict['grasping']['maxAcc']))
-            self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict['grasping']['safety']))
+        if state not in self.timeParamDict:
+            raise RuntimeError(f"state value should belong to {list(self.timeParamDict.keys())}")
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(self.timeParamDict[state]['order']))
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict[state]['maxAcc']))
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict['freefly'][state]))
 
     def solve(self, q):
             """
