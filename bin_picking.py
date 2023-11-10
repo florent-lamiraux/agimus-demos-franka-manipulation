@@ -274,7 +274,9 @@ class BinPicking(object):
 
             for ih in regularHandles:
                 handle = self.factory.handles[ih]
-                for igg, (goalGripper, goalHandle) in enumerate(zip(self.goalGrippers, self.goalHandles)):
+                found = False
+                for igg, (goalGripper, goalHandle) in enumerate(
+                        zip(self.goalGrippers, self.goalHandles)):
                     ggIndex = self.factory.grippers.index(goalGripper)
                     ghIndex = self.factory.handles.index(goalHandle)
                     edges = [f"{goalGripper} > {goalHandle} | {irg}-{ih}_01",
@@ -284,7 +286,9 @@ class BinPicking(object):
                     p = self.generateConsecutivePaths(edges, q)
                     if p:
                         self.placePaths[robotGripper][handle] = p
+                        found = True
                         break
+                    if found: break
 
     def generateConsecutivePaths(self, edges, q, Nsamples = 50):
         """
