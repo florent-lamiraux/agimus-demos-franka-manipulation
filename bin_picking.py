@@ -411,7 +411,7 @@ class BinPicking(object):
             raise RuntimeError(f"state value should belong to {list(self.timeParamDict.keys())}")
         self.transitionPlanner.setParameter('SimpleTimeParameterization/order', convertToAny(self.timeParamDict[state]['order']))
         self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict[state]['maxAcc']))
-        self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict['freefly'][state]))
+        self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict[state]['safety']))
 
     def solve(self, q):
             """
