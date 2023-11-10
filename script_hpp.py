@@ -138,9 +138,9 @@ robot.client.manipulation.robot.insertRobotSRDFModelFromString(
 
 # Discretize handles
 ps.client.manipulation.robot.addGripper("pandas/support_link", "goal/gripper1",
-    [1.05, 0.0, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
+    [1.05, 0.0, 1.02,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
 ps.client.manipulation.robot.addGripper("pandas/support_link", "goal/gripper2",
-    [1.05, 0.0, 1.,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
+    [1.05, 0.0, 1.02,0,-sqrt(2)/2,0,sqrt(2)/2], 0.0)
 ps.client.manipulation.robot.addHandle("part/base_link", "part/center1",
     [0,0,0,0,sqrt(2)/2,0,sqrt(2)/2], 0.03, 3*[True] + [False, True, True])
 ps.client.manipulation.robot.addHandle("part/base_link", "part/center2",
@@ -311,8 +311,6 @@ def GrabAndDrop(robot, ps, binPicking, render):
 
     print("\nPose of the object : \n",poses,"\n")
     # print("\n Transformation matrix : \n",transformation_matrix,"\n")
-
-    
 
     if render:
         print("Rendering the detection on image ...")
