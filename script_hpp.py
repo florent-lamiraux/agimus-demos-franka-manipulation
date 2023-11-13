@@ -35,7 +35,7 @@ from tools_hpp import displayGripper, displayHandle, generateTargetConfig, \
     shootPartInBox, RosInterface
 from bin_picking import BinPicking
 
-import rospy
+import rospy, tf2_ros
 import sys
 import os
 import numpy as np
@@ -304,11 +304,6 @@ def GrabAndDrop(robot, ps, binPicking, render):
     transformation_matrix[:3,3] = poses[4:7]
     transformation_matrix[3,3] = 1
 
-    # image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
-    # bridge = CvBridge()
-    # image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
-    # cv2.imwrite("camera_view.png", image)
-
     print("\nPose of the object : \n",poses,"\n")
     # print("\n Transformation matrix : \n",transformation_matrix,"\n")
 
@@ -328,7 +323,7 @@ def GrabAndDrop(robot, ps, binPicking, render):
         print("[INFO] Object found with no collision")
         print("Solving ...")
         res = False
-        res, p = binPicking.solve(q_init)
+        res, p = binPicking.solve(q_init, False)
         if res:
             ps.client.basic.problem.addPath(p)
             print("Path generated.")
@@ -339,30 +334,69 @@ def GrabAndDrop(robot, ps, binPicking, render):
         print("[INFO] Object found but not collision free")
         print("Trying solving without playing path for simulation ...")
 
-    return q_init, None
+    return q_init, p
 
     # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
 
 def multiple_GrabAndDrop():
     print("Begining of bin picking.")
-    print("[INFO] You need to launch the 'happypose_inference' service.")
-    print("...")
+    print("[INFO] Retriving the number of objects ...")
     nb_obj = service_call()
-    print(nb_obj)
+    print(nb_obj,"objects detected")
+    grab_path = []
+
+    valid =  False
+    attempt = 5
+    confirm = input("Can you confirm the number of objects is correct (y/n) ? : ")
+    while confirm == 'n' and not valid and attempt != 0:
+        nb_obj =  input("What is the number of objects ? : ")
+        valid = input("Are you sure (True/False) ? : ")
+        attempt -= 1
+
     for i in range(nb_obj):
-        print("Poses : ")
         render = False
         q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+        grab_path.append(p)
+    return grab_path
 
 def precise_Grasp():
     print("Begining of precise grasp.")
-    print("[INFO] You need to launch the 'happypose_inference' service.")
-    print("...")
 
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+    q_init, wMo = ri.getObjectPose(q_init)
 
-    return 0
+    poses = np.array(q_init[9:16])
+    rotation_matrix = np.array(wMo)
+    transformation_matrix = np.zeros((4,4))
+    transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
+    transformation_matrix[:3,3] = poses[4:7]
+    transformation_matrix[3,3] = 1
+
+    print("[INFO] Object found with no collision")
+    print("Solving ...")
+    res = False
+    res, p = binPicking.solve(q_init, True)
+    if res:
+        ps.client.basic.problem.addPath(p)
+        print("Path for approach is generated.")
+    else:
+        print(p)
+
+    print("If the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
+    print("If you want to exit the function, you can enter |n|.")
+    print("If the path was generated correctly and you want to proceed, execute the approach then press |y|")
+    confirm = input("Input : ")
+    if confirm == 'y':
+        q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+    if confirm == 'n':
+        print("Exit ...")
+        return 0
+    if confirm == 'retry':
+        precise_Grasp()
 
 
 if __name__ == '__main__':
     render = False # default value
-    q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+    # q_init, p = GrabAndDrop(robot, ps, binPicking, render)

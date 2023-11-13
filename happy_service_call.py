@@ -15,7 +15,6 @@ def get_number_of_objects():
     except rospy.ServiceException as e:
         print("Service call failed : %s"%e)
         response = None
-    print(response)
     return response
 
 def convert_std_msg_to_array(std_msg):
@@ -24,7 +23,6 @@ def convert_std_msg_to_array(std_msg):
     string = string[id:len(string)]
     print("splited string :",string)
     converted_array = eval(string)
-    print(type(converted_array))
     print("Number of object in index 1 : ",converted_array[1])
     print("Number of object in index 2 : ",converted_array[2])
     return converted_array
@@ -32,15 +30,14 @@ def convert_std_msg_to_array(std_msg):
 def service_call():
     print("[START] Starting the happypose service call.")
     call = get_number_of_objects()
-    print(type(call))
-    list_obj = convert_std_msg_to_array(call)
+    nb_obj = 0
     if call != None:
-        nb_obj = 0
+        list_obj = convert_std_msg_to_array(call)
         for el in list_obj:
             nb_obj += el
         print("Number of objects :",nb_obj)
     else:
-        print("No object have detected or the service call failed.")
+        print("No object detected or the service call failed.")
     return nb_obj
 
 if __name__ == '__main__':

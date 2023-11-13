@@ -109,7 +109,7 @@ class BinPicking(object):
     Configuration with which goal configurations are precomputed.
     This configuration defines the poses of objects other than the part.
     """
-    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1., 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.1, 'safety' : 0.95}}
+    timeParamDict = {'freefly':{'order' : 2, 'maxAcc' : 1., 'safety' : 0.95},'grasping':{'order' : 2, 'maxAcc' : 0.1, 'safety' : 0.95},'approach':{'order' : 2, 'maxAcc' : 0.5, 'safety' : 0.95}}
     """
     Configuration of end effector for freefly or grasp.
     """
@@ -417,7 +417,7 @@ class BinPicking(object):
         self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict[state]['maxAcc']))
         self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict[state]['safety']))
 
-    def solve(self, q):
+    def solve(self, q, direct_path):
             """
             Compute a trajectory to grasp and release the object
             - q initial configuration of the robot and objects
@@ -433,6 +433,17 @@ class BinPicking(object):
                     "configurations"
                 return False, msg
             
+            if direct_path:
+                edge = "Loop | f"
+                self.transitionPlanner.setEdge(self.graph.edges[edge])
+                self.setParam('approach')
+                try:
+                    q1 = pickPath.initial()
+                    p_direct = self.wd(self.transitionPlanner.planPath(q, [q1,], True))
+                except Exception as exc:
+                    raise RuntimeError(f"Failed to connect {q} and {q1}: {exc}")
+                return True, p_direct
+
             # Plan paths between waypoint configurations
             edge = "Loop | f"
             self.transitionPlanner.setEdge(self.graph.edges[edge])
