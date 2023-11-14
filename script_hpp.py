@@ -172,6 +172,8 @@ q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
       0, 0, 1.2, 0, 0, 0, 1,
       0, 0, 0.761, 0, 0, 0, 1]
 
+render = False # default value
+
 # Create effector
 print("Building effector.")
 binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
@@ -323,7 +325,7 @@ def GrabAndDrop(robot, ps, binPicking, render):
         print("[INFO] Object found with no collision")
         print("Solving ...")
         res = False
-        res, p = binPicking.solve(q_init, False)
+        res, p = binPicking.solve(q_init)
         if res:
             ps.client.basic.problem.addPath(p)
             print("Path generated.")
@@ -353,11 +355,27 @@ def multiple_GrabAndDrop():
         valid = input("Are you sure (True/False) ? : ")
         attempt -= 1
 
-    for i in range(nb_obj):
+    i = 0
+
+    while i < nb_obj:
         render = False
         q_init, p = GrabAndDrop(robot, ps, binPicking, render)
         grab_path.append(p)
-    return grab_path
+        v = vf.createViewer()
+        v(q_init)
+        print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
+        print("If you want to exit the function, you can enter |n|.")
+        print("If the path was generated correctly and you want to proceed, execute the path then press |y|.")
+        confirm = input("Input : ")
+        if confirm == 'y':
+            i+=1
+        if confirm == 'n':
+            print("Exit ...")
+            i = nb_obj
+            return 0
+        if confirm == 'retry':
+            print("Retrying with the following number of object(s) left : ",nb_obj - i)
+
 
 def precise_Grasp():
     print("Begining of precise grasp.")
@@ -367,36 +385,55 @@ def precise_Grasp():
     res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
     q_init, wMo = ri.getObjectPose(q_init)
 
-    poses = np.array(q_init[9:16])
-    rotation_matrix = np.array(wMo)
-    transformation_matrix = np.zeros((4,4))
-    transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
-    transformation_matrix[:3,3] = poses[4:7]
-    transformation_matrix[3,3] = 1
-
     print("[INFO] Object found with no collision")
     print("Solving ...")
     res = False
-    res, p = binPicking.solve(q_init, True)
+    res, p = binPicking.solve(q_init, 'direct_path')
     if res:
         ps.client.basic.problem.addPath(p)
         print("Path for approach is generated.")
     else:
         print(p)
 
-    print("If the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
+    print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
     print("If you want to exit the function, you can enter |n|.")
     print("If the path was generated correctly and you want to proceed, execute the approach then press |y|")
     confirm = input("Input : ")
-    if confirm == 'y':
-        q_init, p = GrabAndDrop(robot, ps, binPicking, render)
     if confirm == 'n':
         print("Exit ...")
         return 0
     if confirm == 'retry':
         precise_Grasp()
+    if confirm == 'y':
+        # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+        found = False
+        essaie = 0
+        q_init = ri.getCurrentConfig(q0)
+        res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+        q_init, wMo = ri.getObjectPose(q_init)
+
+        while not found and essaie < 25:
+                found, msg = robot.isConfigValid(q_init)
+                essaie += 1
+
+        # Resolving the path to the object
+        if found:
+            print("[INFO] Object found with no collision")
+            print("Solving ...")
+            res = False
+            res, p = binPicking.solve(q_init)
+            if res: 
+                ps.client.basic.problem.addPath(p)
+                print("Path generated.")
+            else:
+                print(p)
+
+        else:
+            print("[INFO] Object found but not collision free")
+            print("Trying solving without playing path for simulation ...")
 
 
 if __name__ == '__main__':
-    render = False # default value
+    print("Script HPP ready !")
+    q_start = RosInterface(robot).getCurrentConfig(q0)
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
