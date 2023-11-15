@@ -27,12 +27,21 @@
 import time
 import numpy as np
 import rospy
+import pinocchio
 from math import sqrt
 from dynamic_graph.ros import RosPublish, RosSubscribe
 from agimus_sot.action import Action
 from franka_gripper.msg import GraspActionGoal, MoveActionGoal
 from hpp.corbaserver.manipulation import Rule
+from agimus_sot.task.posture import Posture
+from agimus_sot import Supervisor
+from agimus_sot.factory import Factory, Affordance
+from agimus_sot.srdf_parser import parse_srdf, attach_all_to_link
+from rospkg import RosPack
 
+Posture.controlGain = 10
+Posture.withDerivative = False
+Supervisor.maxControlNorm = 100
 Action.maxControlSqrNorm = 40
 
 
@@ -134,11 +143,6 @@ class CloseGripper(object):
 
 
 def makeSupervisorWithFactory(robot):
-    from agimus_sot import Supervisor
-    from agimus_sot.factory import Factory, Affordance
-    from agimus_sot.srdf_parser import parse_srdf, attach_all_to_link
-    import pinocchio
-    from rospkg import RosPack
     rospack = RosPack()
 
     srdf = {}

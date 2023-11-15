@@ -351,7 +351,7 @@ def multiple_GrabAndDrop():
     attempt = 5
     confirm = input("Can you confirm the number of objects is correct (y/n) ? : ")
     while confirm == 'n' and not valid and attempt != 0:
-        nb_obj =  input("What is the number of objects ? : ")
+        nb_obj =  int(input("What is the number of objects ? : "))
         valid = input("Are you sure (True/False) ? : ")
         attempt -= 1
 
@@ -389,7 +389,7 @@ def precise_Grasp():
     print("Solving ...")
     res = False
     res, p = binPicking.solve(q_init, 'direct_path')
-    if res:
+    if res: 
         ps.client.basic.problem.addPath(p)
         print("Path for approach is generated.")
     else:
