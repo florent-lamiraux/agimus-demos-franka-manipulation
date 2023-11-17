@@ -35,7 +35,7 @@ from tools_hpp import displayGripper, displayHandle, generateTargetConfig, \
     shootPartInBox, RosInterface
 from bin_picking import BinPicking
 
-import rospy, tf2_ros
+import rospy, tf
 import sys
 import os
 import numpy as np
@@ -49,6 +49,7 @@ from pathlib import Path
 from bokeh.io import export_png
 from bokeh.plotting import gridplot
 from happy_service_call import service_call
+from multiprocessing import Process, Queue
 
 from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
 from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
@@ -346,35 +347,43 @@ def multiple_GrabAndDrop():
     nb_obj = service_call()
     print(nb_obj,"objects detected")
     grab_path = []
+    found = False
 
-    valid =  False
-    attempt = 5
-    confirm = input("Can you confirm the number of objects is correct (y/n) ? : ")
-    while confirm == 'n' and not valid and attempt != 0:
-        nb_obj =  int(input("What is the number of objects ? : "))
-        valid = input("Are you sure (True/False) ? : ")
-        attempt -= 1
+    listener = tf.TransformListener()
+    ros_process = Process(target=service_call)
 
-    i = 0
+    rospy.wait_for_service('happypose_inference')
 
-    while i < nb_obj:
-        render = False
-        q_init, p = GrabAndDrop(robot, ps, binPicking, render)
-        grab_path.append(p)
-        v = vf.createViewer()
-        v(q_init)
-        print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
-        print("If you want to exit the function, you can enter |n|.")
-        print("If the path was generated correctly and you want to proceed, execute the path then press |y|.")
-        confirm = input("Input : ")
-        if confirm == 'y':
-            i+=1
-        if confirm == 'n':
-            print("Exit ...")
-            i = nb_obj
-            return 0
-        if confirm == 'retry':
-            print("Retrying with the following number of object(s) left : ",nb_obj - i)
+
+
+    # valid =  False
+    # attempt = 5
+    # confirm = input("Can you confirm the number of objects is correct (y/n) ? : ")
+    # while confirm == 'n' and not valid and attempt != 0:
+    #     nb_obj =  int(input("What is the number of objects ? : "))
+    #     valid = input("Are you sure (True/False) ? : ")
+    #     attempt -= 1
+
+    # i = 0
+
+    # while i < nb_obj:
+    #     render = False
+    #     q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+    #     grab_path.append(p)
+    #     v = vf.createViewer()
+    #     v(q_init)
+    #     print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
+    #     print("If you want to exit the function, you can enter |n|.")
+    #     print("If the path was generated correctly and you want to proceed, execute the path then press |y|.")
+    #     confirm = input("Input : ")
+    #     if confirm == 'y':
+    #         i+=1
+    #     if confirm == 'n':
+    #         print("Exit ...")
+    #         i = nb_obj
+    #         return 0
+    #     if confirm == 'retry':
+    #         print("Retrying with the following number of object(s) left : ",nb_obj - i)
 
 
 def precise_Grasp():
@@ -432,8 +441,45 @@ def precise_Grasp():
             print("[INFO] Object found but not collision free")
             print("Trying solving without playing path for simulation ...")
 
+def simultanous_Grasp():
+    print("Begining of simultanous grasp.")
+    
+    found = False
+    essaie = 0
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+
+    ros_process = Process(target=service_call)
+    ros_process.start()
+
+    q_init, wMo = ri.getObjectPose(q_init)
+
+    while wMo != None and not found and essaie < 25:
+        found, msg = robot.isConfigValid(q_init)
+        essaie += 1
+
+    # Resolving the path to the object
+    if found:
+        print("[INFO] Object found with no collision")
+        print("Solving ...")
+        res = False
+        res, p = binPicking.solve(q_init)
+        if res:
+            ps.client.basic.problem.addPath(p)
+            print("Path generated.")
+        else:
+            print(p)
+
+    else:
+        print("[INFO] Object found but not collision free")
+        print("Trying solving without playing path for simulation ...")
+
+    return q_init, p
+
 
 if __name__ == '__main__':
     print("Script HPP ready !")
     q_start = RosInterface(robot).getCurrentConfig(q0)
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+    # q_init, p = simultanous_Grasp()
