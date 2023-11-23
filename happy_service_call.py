@@ -74,6 +74,8 @@ def pose_getter():
     print("theta z : ",theta_z)
     print("theta w : ",theta_w)
                 
+    #Tests fait dans le script get_poses_from_tf_test.py dans /home/dorian/Downloads.
+    
     return list_pose
 
 
