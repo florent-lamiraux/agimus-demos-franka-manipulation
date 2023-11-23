@@ -394,6 +394,9 @@ def precise_Grasp():
     res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
     q_init, wMo = ri.getObjectPose(q_init)
 
+    v = vf.createViewer()
+    v(q_init)
+
     print("[INFO] Object found with no collision")
     print("Solving ...")
     res = False
@@ -405,6 +408,7 @@ def precise_Grasp():
         print(p)
 
     print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
+    print("If the path visualization is missing on gepetto-gui, you can enter |q_init|.")
     print("If you want to exit the function, you can enter |n|.")
     print("If the path was generated correctly and you want to proceed, execute the approach then press |y|")
     confirm = input("Input : ")
@@ -413,6 +417,10 @@ def precise_Grasp():
         return 0
     if confirm == 'retry':
         precise_Grasp()
+    if confirm == 'q_init':
+        v = vf.createViewer()
+        v(q_init)
+        confirm = 'y'
     if confirm == 'y':
         # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
         found = False
@@ -420,6 +428,7 @@ def precise_Grasp():
         q_init = ri.getCurrentConfig(q0)
         res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
         q_init, wMo = ri.getObjectPose(q_init)
+        q_init[11] += 0.02 # height +2 cm
 
         while not found and essaie < 25:
                 found, msg = robot.isConfigValid(q_init)
