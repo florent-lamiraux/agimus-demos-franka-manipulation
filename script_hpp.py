@@ -73,6 +73,11 @@ print("To avoid crash during constrain graph building, kill the hppcorbaserver p
 
 connectedToRos = True
 
+# try:
+#     from constrain_graph import constrain_graph_variables
+# except:
+#     print("Failed to import constrain graph variables")
+
 try:
     import rospy
     Robot.urdfString = rospy.get_param('robot_description')
@@ -278,8 +283,8 @@ def save_predictions(renderings):
     export_png(fig_all, filename=vis_dir / "all_results.png")
     print("Images save in : ",vis_dir)
 
+#__________________________________________________
 
-#___________________END_COSYPOSE___________________
 
 def GrabAndDrop(robot, ps, binPicking, render):
     # Get configuration of the robot
@@ -384,7 +389,6 @@ def multiple_GrabAndDrop():
     #         return 0
     #     if confirm == 'retry':
     #         print("Retrying with the following number of object(s) left : ",nb_obj - i)
-
 
 def precise_Grasp():
     print("Begining of precise grasp.")
