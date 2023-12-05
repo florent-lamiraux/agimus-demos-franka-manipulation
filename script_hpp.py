@@ -50,6 +50,7 @@ from bokeh.io import export_png
 from bokeh.plotting import gridplot
 from happy_service_call import service_call
 from multiprocessing import Process, Queue
+from get_poses_from_tf import main_function
 
 from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
 from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
@@ -337,12 +338,13 @@ def GrabAndDrop(robot, ps, binPicking, render):
             print("Path generated.")
         else:
             print(p)
+        return q_init, p
 
     else:
         print("[INFO] Object found but not collision free")
         print("Trying solving without playing path for simulation ...")
 
-    return q_init, p
+    return q_init
 
     # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
 
@@ -489,6 +491,11 @@ def simultanous_Grasp():
         print("Trying solving without playing path for simulation ...")
 
     return q_init, p
+
+def detect_and_grasp():
+    print("[INFO] Getting objects poses.")
+    list_of_poses = main_function(True)
+    print(list_of_poses)
 
 
 if __name__ == '__main__':
