@@ -62,6 +62,9 @@ from happypose.toolbox.visualization.bokeh_plotter import BokehPlotter
 from happypose.toolbox.visualization.utils import make_contour_overlay
 from happypose.toolbox.utils.logging import get_logger, set_logging_level
 
+from agimus_demos.tools_hpp import concatenatePaths
+from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
+
 logger = get_logger(__name__)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -251,11 +254,6 @@ def save_predictions(renderings):
     example_dir = Path(data_dir) / "examples/tless"
     rgb_render = renderings.rgb
     rgb = np.array(img_PIL.open("camera_view.png"), dtype=np.uint8)
-    # render_prediction_wrt_camera calls BulletSceneRenderer.render_scene using only one camera at pose Identity and return only rgb values
-    # BulletSceneRenderer.render_scene: gets a "object list" (prediction like object), a list of camera infos (with Km pose, res) and renders
-    # a "camera observation" for each camera/viewpoint
-    # Actually, renders: rgb, mask, depth, near, far
-    #rgb_render = render_prediction_wrt_camera(renderer, preds, cam)
     mask = ~(rgb_render.sum(axis=-1) == 0)
     alpha = 0.1
     rgb_n_render = rgb.copy()
@@ -298,8 +296,6 @@ def GrabAndDrop(robot, ps, binPicking, render):
         assert(res)
     else:
         q_init = q0[:]
-
-    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
 
     # Detecting the object poses
     found = False
@@ -346,51 +342,100 @@ def GrabAndDrop(robot, ps, binPicking, render):
 
     return q_init
 
-    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
-
 def multiple_GrabAndDrop():
     print("Begining of bin picking.")
     print("[INFO] Retriving the number of objects ...")
     nb_obj = service_call()
     print(nb_obj,"objects detected")
-    grab_path = []
+
+    path_id = 0
+    essaie = 0
     found = False
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
 
-    listener = tf.TransformListener()
+    for i in range(nb_obj):
+        ros_process = Process(target=service_call)
+        ros_process.start()
+        
+        q_init, wMo = ri.getObjectPose(q_init)
+        
+        while wMo != None and not found and essaie < 25:
+            found, msg = robot.isConfigValid(q_init)
+            essaie += 1
+        ros_process.terminate()
+
+        # Resolving the path to the object
+        if found:
+            print("[INFO] Object found with no collision")
+            print("Solving ...")
+            res = False
+            res, p = binPicking.solve(q_init)
+            if res:
+                ps.client.basic.problem.addPath(p)
+                print("Path generated.")
+            else:
+                print(p)
+
+        else:
+            print("[INFO] Object found but not collision free")
+            print("Trying solving without playing path for simulation ...")
+
+        cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
+        nbPaths = cc.hppClient.problem.numberPaths()
+        print("Number of path :",nbPaths)
+
+        print("Starting movement number ",i)
+        input("Press Enter to start the movement ...")
+        cc.playPath(path_id,collect_data = False)
+        if not cc.errorOccured:
+            print("Ran {}".format(i))
+            i+=1
+        # playAllPaths(path_id)
+
+        print("Once the path is played, press ENTER.")
+        input("Press Enter to continue ...")
+
+        path_id += 1
+    
+    print("All path played.")
+
+def simultanous_Grasp():
+    print("Begining of simultanous grasp.")
+    
+    found = False
+    essaie = 0
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+
     ros_process = Process(target=service_call)
+    ros_process.start()
 
-    rospy.wait_for_service('happypose_inference')
+    q_init, wMo = ri.getObjectPose(q_init)
 
+    while wMo != None and not found and essaie < 25:
+        found, msg = robot.isConfigValid(q_init)
+        essaie += 1
 
+    # Resolving the path to the object
+    if found:
+        print("[INFO] Object found with no collision")
+        print("Solving ...")
+        res = False
+        res, p = binPicking.solve(q_init)
+        if res:
+            ps.client.basic.problem.addPath(p)
+            print("Path generated.")
+        else:
+            print(p)
 
-    # valid =  False
-    # attempt = 5
-    # confirm = input("Can you confirm the number of objects is correct (y/n) ? : ")
-    # while confirm == 'n' and not valid and attempt != 0:
-    #     nb_obj =  int(input("What is the number of objects ? : "))
-    #     valid = input("Are you sure (True/False) ? : ")
-    #     attempt -= 1
+    else:
+        print("[INFO] Object found but not collision free")
+        print("Trying solving without playing path for simulation ...")
 
-    # i = 0
-
-    # while i < nb_obj:
-    #     render = False
-    #     q_init, p = GrabAndDrop(robot, ps, binPicking, render)
-    #     grab_path.append(p)
-    #     v = vf.createViewer()
-    #     v(q_init)
-    #     print("\nIf the path wasn't generated or the object wasn't detected correctly, you can enter |retry|.")
-    #     print("If you want to exit the function, you can enter |n|.")
-    #     print("If the path was generated correctly and you want to proceed, execute the path then press |y|.")
-    #     confirm = input("Input : ")
-    #     if confirm == 'y':
-    #         i+=1
-    #     if confirm == 'n':
-    #         print("Exit ...")
-    #         i = nb_obj
-    #         return 0
-    #     if confirm == 'retry':
-    #         print("Retrying with the following number of object(s) left : ",nb_obj - i)
+    return q_init, p
 
 def precise_Grasp():
     print("Begining of precise grasp.")
@@ -456,46 +501,20 @@ def precise_Grasp():
             print("[INFO] Object found but not collision free")
             print("Trying solving without playing path for simulation ...")
 
-def simultanous_Grasp():
-    print("Begining of simultanous grasp.")
-    
-    found = False
-    essaie = 0
-    ri = RosInterface(robot)
-    q_init = ri.getCurrentConfig(q0)
-    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
-
-    ros_process = Process(target=service_call)
-    ros_process.start()
-
-    q_init, wMo = ri.getObjectPose(q_init)
-
-    while wMo != None and not found and essaie < 25:
-        found, msg = robot.isConfigValid(q_init)
-        essaie += 1
-
-    # Resolving the path to the object
-    if found:
-        print("[INFO] Object found with no collision")
-        print("Solving ...")
-        res = False
-        res, p = binPicking.solve(q_init)
-        if res:
-            ps.client.basic.problem.addPath(p)
-            print("Path generated.")
-        else:
-            print(p)
-
-    else:
-        print("[INFO] Object found but not collision free")
-        print("Trying solving without playing path for simulation ...")
-
-    return q_init, p
-
 def detect_and_grasp():
     print("[INFO] Getting objects poses.")
-    list_of_poses = main_function(True)
-    print(list_of_poses)
+    dict_of_poses, list_of_names = main_function(False)
+
+def dict_to_list_poses(dict_of_poses,list_of_name):
+    list_of_poses = []
+    list_var = ['x','y','z','theta x','theta y','theta z','theta w']
+    nb_of_obj = len(dict_of_poses)
+    for i in range(nb_of_obj):
+        list_of_poses.append([])
+        for j in range(7):
+            list_of_poses.append(dict_of_poses[list_of_name[i]][list_var[j]])
+    return list_of_poses
+
 
 
 if __name__ == '__main__':
@@ -503,3 +522,4 @@ if __name__ == '__main__':
     q_start = RosInterface(robot).getCurrentConfig(q0)
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
     # q_init, p = simultanous_Grasp()
+    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)

@@ -11,7 +11,7 @@ from tf2_msgs.msg import TFMessage
 def callback(msg):
     
     global object_poses
-    global List_name
+    global list_name
     global x
     global y
     global z
@@ -20,12 +20,10 @@ def callback(msg):
     global theta_z
     global theta_w
 
-    nb_of_frame = len(msg.transforms)
-
     name = msg.transforms[0].child_frame_id
-    if 'tless' in name and name not in List_name:
+    if 'tless' in name and name not in list_name:
         print("Object found :", name)
-        List_name.append(msg.transforms[0].child_frame_id)
+        list_name.append(msg.transforms[0].child_frame_id)
 
         x = msg.transforms[0].transform.translation.x
         y = msg.transforms[0].transform.translation.y
@@ -44,22 +42,30 @@ def callback(msg):
         object_poses[str(name)]['theta z'] = theta_z
         object_poses[str(name)]['theta w'] = theta_w
 
-
 def listener():
-    rospy.init_node('listener', anonymous=True)
     rospy.Subscriber("tf", TFMessage, callback)
     # rospy.spin()
 
-def listener_nonode():
-    rospy.Subscriber("tf", TFMessage, callback)
-    # rospy.spin()
+def setting_variables():
+    print("Setting up the global variables.")
+    object_poses = {}
+    List_name = []
+    x = None
+    y = None
+    z = None
+    theta_x = None
+    theta_y = None
+    theta_z = None
+    theta_w = None
 
-def main_function(init_node=False):
+    return object_poses, list_name, x,y,z,theta_x,theta_y,theta_z,theta_w
+
+def main_function(init_node=True):
     print("[INFO] Launch the happypose_inference service (30s before timeout).")
     
     break_var = False
     global object_poses
-    global List_name
+    global list_name
     global x
     global y
     global z
@@ -73,12 +79,12 @@ def main_function(init_node=False):
     try:
         x not in globals()
     except:
-        print("varaibles not in globals")
+        print("[INFO] varaibles not in globals")
         try:
             x not in locals()
         except:
-            print("varaibles not in locals")
-            object_poses, List_name, x,y,z,theta_x,theta_y,theta_z,theta_w = setting_variables()
+            print("[INFO] varaibles not in locals")
+            object_poses, list_name, x,y,z,theta_x,theta_y,theta_z,theta_w = setting_variables()
 
     # Resetting the global variables
     if x != None:
@@ -93,43 +99,31 @@ def main_function(init_node=False):
         theta_z = None
         theta_w = None
     else:
-        print("Variables already set.")
+        print("Variables set.")
 
     timeout = time.time() + 30
     time_start = time.time()
+
+    if init_node:
+        print("Initializing ROS node")
+        rospy.init_node('listener', anonymous=True)
 
     while x == None and not break_var:
         if time.time() > timeout:
             break_var = True
             print("Elapsed time : 30s.")
-        if init_node:
-            listener_nonode()
-        else:
-            listener()
+        listener()
         rospy.sleep(1)
         time_elapsed = time.time()-time_start
         sys.stdout.write("Current time : %d \r" % (time_elapsed))
         # sys.stdout.write("Current state of break : %d \r" % (break_var))
         sys.stdout.flush()
 
-    print("\n",List_name)
+    print("\n",list_name)
     print("\n",object_poses)
+    print(len(object_poses))
 
-    return object_poses
-
-def setting_variables():
-    print("Setting up the global variables.")
-    object_poses = {}
-    List_name = []
-    x = None
-    y = None
-    z = None
-    theta_x = None
-    theta_y = None
-    theta_z = None
-    theta_w = None
-
-    return object_poses, List_name, x,y,z,theta_x,theta_y,theta_z,theta_w
+    return object_poses,List_name
 
 
 if __name__ == '__main__':
@@ -137,7 +131,7 @@ if __name__ == '__main__':
     print("get_poses_from_tf ready !")
 
     # Global variable
-    List_name = []
+    list_name = []
     object_poses = {}
     x = None
     y = None

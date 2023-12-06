@@ -433,6 +433,7 @@ class BinPicking(object):
                     "configurations"
                 return False, msg
             
+            # Direct Path Plan
             if type_of_path == 'direct_path':
                 edge = "Loop | f"
                 self.transitionPlanner.setEdge(self.graph.edges[edge])
@@ -444,6 +445,7 @@ class BinPicking(object):
                     raise RuntimeError(f"Failed to connect {q} and {q1}: {exc}")
                 return True, p_direct
             
+            # Precise Path Plan
             if type_of_path == 'precise':
                 ig = self.factory.grippers.index(gripper)
                 ih = self.factory.handles.index(handle)
@@ -471,6 +473,7 @@ class BinPicking(object):
                     raise RuntimeError(f"Failed to connect {q6} and {q7}: {exc}")
                 return True, concatenatePaths([pickPath,p4,placePath,p7])
 
+            # Default Path Plan
             if type_of_path == 'default':
                 # Plan paths between waypoint configurations
                 edge = "Loop | f"
