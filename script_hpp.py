@@ -346,7 +346,11 @@ def multiple_GrabAndDrop():
     print("Begining of bin picking.")
     print("[INFO] Retriving the number of objects ...")
     nb_obj = service_call()
-    print(nb_obj,"objects detected")
+    print(nb_obj,"objects detected by the service")
+    verif = input("What is the exact number of objects : ")
+
+    if verif == '': pass
+    elif int(verif) != nb_obj: nb_obj = verif
 
     path_id = 0
     essaie = 0
@@ -385,6 +389,13 @@ def multiple_GrabAndDrop():
         cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
         nbPaths = cc.hppClient.problem.numberPaths()
         print("Number of path :",nbPaths)
+        
+        viz = input("Do you want to vizualise the mouvement first ? ")
+        if viz == 'yes':
+            v = vf.createViewer()
+            v(q_init)
+            print("[INFO] Viewer created.")
+            input("Press Enter to continue ...")
 
         print("Starting movement number ",i)
         input("Press Enter to start the movement ...")
@@ -521,5 +532,4 @@ if __name__ == '__main__':
     print("Script HPP ready !")
     q_start = RosInterface(robot).getCurrentConfig(q0)
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
-    # q_init, p = simultanous_Grasp()
     # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
