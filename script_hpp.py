@@ -211,7 +211,6 @@ def make_object_dataset(example_dir: Path) -> RigidObjectDataset:
     rigid_object_dataset = RigidObjectDataset(rigid_objects)
     return rigid_object_dataset
 
-
 def rendering(poses):
     data_dir = os.getenv("MEGAPOSE_DATA_DIR")
     example_dir = Path(data_dir) / "examples/tless"
@@ -344,6 +343,18 @@ def GrabAndDrop(robot, ps, binPicking, render):
 
 def multiple_GrabAndDrop():
     print("Begining of bin picking.")
+
+    # Cleaning the path vector
+    number_of_path = ps.numberPaths()
+    if number_of_path > 0:
+        print("Cleaning the path vector.")
+        for i in range(number_of_path):
+            ps.erasePath(i)
+            sys.stdout.write("[INFO] Erasing path number %d." % (i))
+        sys.stdout.flush()
+    else:
+        print("No path to clean.")
+
     print("[INFO] Retriving the number of objects ...")
     nb_obj = service_call()
     print(nb_obj,"objects detected by the service")
@@ -403,13 +414,12 @@ def multiple_GrabAndDrop():
         if not cc.errorOccured:
             print("Ran {}".format(i))
             i+=1
-        # playAllPaths(path_id)
 
         print("Once the path is played, press ENTER.")
         input("Press Enter to continue ...")
 
         path_id += 1
-    
+
     print("All path played.")
 
 def simultanous_Grasp():
