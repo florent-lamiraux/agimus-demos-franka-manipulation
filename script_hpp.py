@@ -355,6 +355,7 @@ def multiple_GrabAndDrop():
     else:
         print("No path to clean.")
 
+    # Getting the number of object
     print("[INFO] Retriving the number of objects ...")
     nb_obj = service_call()
     print(nb_obj,"objects detected by the service")
@@ -363,6 +364,7 @@ def multiple_GrabAndDrop():
     if verif == '': pass
     elif int(verif) != nb_obj: nb_obj = verif
 
+    # Initialize variables
     path_id = 0
     essaie = 0
     found = False
@@ -371,6 +373,8 @@ def multiple_GrabAndDrop():
     res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
 
     for i in range(nb_obj):
+
+        # Starting ROS cosypose detection process
         ros_process = Process(target=service_call)
         ros_process.start()
         
@@ -408,6 +412,7 @@ def multiple_GrabAndDrop():
             print("[INFO] Viewer created.")
             input("Press Enter to continue ...")
 
+        # Playing the movement
         print("Starting movement number ",i)
         input("Press Enter to start the movement ...")
         cc.playPath(path_id,collect_data = False)
