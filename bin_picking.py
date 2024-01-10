@@ -417,6 +417,22 @@ class BinPicking(object):
         self.transitionPlanner.setParameter('SimpleTimeParameterization/maxAcceleration', convertToAny(self.timeParamDict[state]['maxAcc']))
         self.transitionPlanner.setParameter('SimpleTimeParameterization/safety', convertToAny(self.timeParamDict[state]['safety']))
 
+    def direct_Path(self, q_start, q_goal):
+        q = q_start
+        edge = "Loop | f"
+        self.transitionPlanner.setEdge(self.graph.edges[edge])
+        self.setParam('approach')
+        try:
+            p_direct, res, msg = self.transitionPlanner.directPath(q_start, q_goal, True)
+            print("Achieve to create a direct path : ",res)
+            if not res:
+                gripper, handle, pickPath, placePath = self.selectGrasp(q)
+                q1 = pickPath.initial()
+                p_direct = self.wd(self.transitionPlanner.planPath(q, [q1,], True))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to connect {q_start} and {q_goal}: {exc}")
+        return True, p_direct
+
     def solve(self, q, type_of_path='default'):
             """
             Compute a trajectory to grasp and release the object

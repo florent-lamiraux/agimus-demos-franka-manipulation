@@ -50,7 +50,7 @@ from bokeh.io import export_png
 from bokeh.plotting import gridplot
 from happy_service_call import service_call
 from multiprocessing import Process, Queue
-from get_poses_from_tf import main_function
+from get_poses_from_tf import get_poses
 
 from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
 from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
@@ -281,7 +281,7 @@ def save_predictions(renderings):
     export_png(fig_all, filename=vis_dir / "all_results.png")
     print("Images save in : ",vis_dir)
 
-#__________________________________________________
+#____________________________________________________________________________
 
 
 def GrabAndDrop(robot, ps, binPicking, render):
@@ -427,6 +427,17 @@ def multiple_GrabAndDrop():
 
     print("All path played.")
 
+    # Cleaning the path vector (again)
+    number_of_path = ps.numberPaths()
+    if number_of_path > 0:
+        print("Cleaning the path vector.")
+        for i in range(number_of_path):
+            ps.erasePath(i)
+            sys.stdout.write("[INFO] Erasing path number %d." % (i))
+        sys.stdout.flush()
+    else:
+        print("No path to clean.")
+
 def simultanous_Grasp():
     print("Begining of simultanous grasp.")
     
@@ -527,9 +538,11 @@ def precise_Grasp():
             print("[INFO] Object found but not collision free")
             print("Trying solving without playing path for simulation ...")
 
+#______________________________Utility_funtions______________________________
+            
 def detect_and_grasp():
     print("[INFO] Getting objects poses.")
-    dict_of_poses, list_of_names = main_function(False)
+    dict_of_poses, list_of_names = get_poses(False)
 
 def dict_to_list_poses(dict_of_poses,list_of_name):
     list_of_poses = []
@@ -541,6 +554,57 @@ def dict_to_list_poses(dict_of_poses,list_of_name):
             list_of_poses.append(dict_of_poses[list_of_name[i]][list_var[j]])
     return list_of_poses
 
+def move_robot():
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    q_start = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+
+    """
+    q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
+      0, 0, 1.2, 0, 0, 0, 1,
+      0, 0, 0.761, 0, 0, 0, 1]
+    """
+
+    # q_init[0:8] = q0[0:8]
+
+    found, msg = robot.isConfigValid(q_init)
+
+    if found:
+        print("[INFO] Object found with no collision")
+        print("Solving ...")
+        res = False
+        res, p = binPicking.solve(q_init, 'direct_path')
+        if res:
+            ps.client.basic.problem.addPath(p)
+            print("Path generated.")
+        else:
+            print(p)
+
+    else:
+        print("[INFO] Object found but not collision free")
+        print("Trying solving without playing path for simulation ...")
+    
+    motion = input("Do you want to play the movement ? [y/n] : ")
+    if motion == 'y':
+        cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
+        input("Press Enter to start the movement ...")
+        cc.playPath(0,collect_data = False)
+        if not cc.errorOccured:
+            print("Ran {}".format(0))
+
+    # Cleaning the path vector
+    number_of_path = ps.numberPaths()
+    if number_of_path > 0:
+        print("Cleaning the path vector.")
+        for i in range(number_of_path):
+            ps.erasePath(i)
+            sys.stdout.write("[INFO] Erasing path number %d." % (i))
+        sys.stdout.flush()
+    else:
+        print("No path to clean.")
+        
+#____________________________________________________________________________
 
 
 if __name__ == '__main__':

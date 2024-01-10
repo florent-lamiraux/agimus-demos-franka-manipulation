@@ -60,7 +60,7 @@ def setting_variables():
 
     return object_poses, list_name, x,y,z,theta_x,theta_y,theta_z,theta_w
 
-def main_function(init_node=True):
+def get_poses(init_node=True):
     print("[INFO] Launch the happypose_inference service (30s before timeout).")
     
     break_var = False
@@ -79,11 +79,11 @@ def main_function(init_node=True):
     try:
         x not in globals()
     except:
-        print("[INFO] varaibles not in globals")
+        print("[INFO] variables not in globals")
         try:
             x not in locals()
         except:
-            print("[INFO] varaibles not in locals")
+            print("[INFO] variables not in locals")
             object_poses, list_name, x,y,z,theta_x,theta_y,theta_z,theta_w = setting_variables()
 
     # Resetting the global variables
@@ -101,12 +101,12 @@ def main_function(init_node=True):
     else:
         print("Variables set.")
 
-    timeout = time.time() + 30
-    time_start = time.time()
-
     if init_node:
         print("Initializing ROS node")
         rospy.init_node('listener', anonymous=True)
+
+    time_start = time.time()
+    timeout = time_start + 30
 
     while x == None and not break_var:
         if time.time() > timeout:
