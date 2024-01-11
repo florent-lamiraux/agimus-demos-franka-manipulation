@@ -345,15 +345,7 @@ def multiple_GrabAndDrop():
     print("Begining of bin picking.")
 
     # Cleaning the path vector
-    number_of_path = ps.numberPaths()
-    if number_of_path > 0:
-        print("Cleaning the path vector.")
-        for i in range(number_of_path):
-            ps.erasePath(i)
-            sys.stdout.write("[INFO] Erasing path number %d." % (i))
-        sys.stdout.flush()
-    else:
-        print("No path to clean.")
+    clean_path_vector()
 
     # Getting the number of object
     print("[INFO] Retriving the number of objects ...")
@@ -428,15 +420,9 @@ def multiple_GrabAndDrop():
     print("All path played.")
 
     # Cleaning the path vector (again)
-    number_of_path = ps.numberPaths()
-    if number_of_path > 0:
-        print("Cleaning the path vector.")
-        for i in range(number_of_path):
-            ps.erasePath(i)
-            sys.stdout.write("[INFO] Erasing path number %d." % (i))
-        sys.stdout.flush()
-    else:
-        print("No path to clean.")
+    clean_path_vector()
+
+    return q_init
 
 def simultanous_Grasp():
     print("Begining of simultanous grasp.")
@@ -540,6 +526,20 @@ def precise_Grasp():
 
 #______________________________Utility_funtions______________________________
             
+def clean_path_vector():
+    # Cleaning the path vector
+    number_of_path = ps.numberPaths() #getting the number of path
+    print("Number of paths : ",number_of_path)
+    if number_of_path > 0:
+        print("Cleaning the path vector.")
+        # Erasing every vector in the vector path
+        for i in range(number_of_path):
+            ps.erasePath(number_of_path - i - 1)
+            sys.stdout.write("[INFO] Erasing path number %d.\n" % (number_of_path - i - 1))
+            sys.stdout.flush()
+    else:
+        print("No path to clean.")
+     
 def detect_and_grasp():
     print("[INFO] Getting objects poses.")
     dict_of_poses, list_of_names = get_poses(False)
@@ -555,54 +555,75 @@ def dict_to_list_poses(dict_of_poses,list_of_name):
     return list_of_poses
 
 def move_robot():
-    ri = RosInterface(robot)
-    q_init = ri.getCurrentConfig(q0)
-    q_start = ri.getCurrentConfig(q0)
-    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+    keep_moving = True
 
-    """
-    q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
-      0, 0, 1.2, 0, 0, 0, 1,
-      0, 0, 0.761, 0, 0, 0, 1]
-    """
+    while keep_moving:
+        ri = RosInterface(robot)
+        q_init = ri.getCurrentConfig(q0)
+        res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
 
-    # q_init[0:8] = q0[0:8]
+        """
+        q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
+        0, 0, 1.2, 0, 0, 0, 1,
+        |id = 9
+        0, 0, 0.761, 0, 0, 0, 1]
+                |id = 18
 
-    found, msg = robot.isConfigValid(q_init)
+        gripper is 0.125m above the object referential (e.g. obj Z = 1.2 / gripper Z = 1.325)
+        gripper coordinate in obj referential :
+        x_gripper = -x_obj
+        y_gripper = y_obj   
+        z_gripper = z_obj + 0.125
 
-    if found:
-        print("[INFO] Object found with no collision")
-        print("Solving ...")
-        res = False
-        res, p = binPicking.solve(q_init, 'direct_path')
-        if res:
-            ps.client.basic.problem.addPath(p)
-            print("Path generated.")
+        When the object_tless_01 is on a surface, its center is 17.495 mm above the surface
+
+        to have the gripper 10 cm above the object -> z = z_obj + 0.09875
+        to have the gripper 10 cm above the surface -> z = 0.081255
+        to have the gripper x cm above the surface -> x = x - 0.081255
+        to have the camera x cm above the object -> x = x- 0.081255 - 0.175
+
+        """
+
+        distance_from_table = int(input("How many cm do you want the gripper to have above the object ? "))/100 - 0.09875 - 0.175 # Distance of the object from the table
+        distance = distance_from_table + 0.76
+        q_init[11] = distance
+
+        found, msg = robot.isConfigValid(q_init)
+
+        if found:
+            print("[INFO] Object found with no collision")
+            print("Solving ...")
+            res = False
+            res, p = binPicking.solve(q_init, 'direct_path')
+            if res:
+                ps.client.basic.problem.addPath(p)
+                print("Path generated.")
+            else:
+                print(p)
+
         else:
-            print(p)
+            print("[INFO] Object found but not collision free")
+            print("Returning goal configuration for simulation ...")
+        
+        motion = input("Do you want to play the movement ? [y/n] : ")
+        if motion == 'y':
+            path_id = ps.numberPaths()
+            cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
+            input("Press Enter to start the movement ...")
+            cc.playPath(path_id - 1,collect_data = False)
+            if not cc.errorOccured:
+                print("Ran {}".format(path_id))
+        
+        erase = input("Erasing the path vector ? [y/n] : ")
+        if erase == 'y':
+            clean_path_vector()
+        
+        moving = input("Do you want to move the robot again ? [y/n] : ")
+        
+        if moving == 'n':
+            keep_moving = False
 
-    else:
-        print("[INFO] Object found but not collision free")
-        print("Trying solving without playing path for simulation ...")
-    
-    motion = input("Do you want to play the movement ? [y/n] : ")
-    if motion == 'y':
-        cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
-        input("Press Enter to start the movement ...")
-        cc.playPath(0,collect_data = False)
-        if not cc.errorOccured:
-            print("Ran {}".format(0))
-
-    # Cleaning the path vector
-    number_of_path = ps.numberPaths()
-    if number_of_path > 0:
-        print("Cleaning the path vector.")
-        for i in range(number_of_path):
-            ps.erasePath(i)
-            sys.stdout.write("[INFO] Erasing path number %d." % (i))
-        sys.stdout.flush()
-    else:
-        print("No path to clean.")
+    return q_init
         
 #____________________________________________________________________________
 
