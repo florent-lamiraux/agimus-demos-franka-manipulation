@@ -575,6 +575,10 @@ def move_robot():
         y_gripper = y_obj   
         z_gripper = z_obj + 0.125
 
+        for a 90° rotation of the object :
+        q_init[13] = 0.70710678
+        q_init[15] = 0.70710678
+
         When the object_tless_01 is on a surface, its center is 17.495 mm above the surface
 
         to have the gripper 10 cm above the object -> z = z_obj + 0.09875
@@ -613,6 +617,25 @@ def move_robot():
             cc.playPath(path_id - 1,collect_data = False)
             if not cc.errorOccured:
                 print("Ran {}".format(path_id))
+
+        capture = input("Do you want to capture the camera POV ? [y/n] :")
+        if capture == 'y':
+            try:
+                capture_camera()
+            except:
+                print("[WARN] The camera channel might not be on the port 2. Try with a different port.")
+                wrong_port = True
+                while wrong_port:
+                    cam_id = int(input("Channel : "))
+                    try:
+                        capture_camera(cam_id)
+                        wrong_port = False
+                    except:
+                        print("Wrong port again. If you see this message too much, the error might be something else.")
+                        again = input("Try again ? [y/n] : ")
+                        if again == 'n':
+                            wrong_port = False
+
         
         erase = input("Erasing the path vector ? [y/n] : ")
         if erase == 'y':
@@ -624,7 +647,18 @@ def move_robot():
             keep_moving = False
 
     return q_init
-        
+
+def capture_camera(cam_id = 2):
+    print("[INFO] Opening camera channel on port",cam_id,".")
+    cam = cv2.VideoCapture(cam_id) # default camera port is 2
+    result, image = cam.read()
+    print("To close camera stream, press Q.")
+    if result:
+        cv2.imshow("camera capture", image)
+        cv2.imwrite("/home/dbaudu/Downloads/test.png", image)
+        cv2.waitKey(0)
+        cv2.destroyWindow("camera capture")
+    return image
 #____________________________________________________________________________
 
 
