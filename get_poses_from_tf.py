@@ -49,7 +49,7 @@ def listener():
 def setting_variables():
     print("Setting up the global variables.")
     object_poses = {}
-    List_name = []
+    list_name = []
     x = None
     y = None
     z = None
@@ -90,7 +90,7 @@ def get_poses(init_node=True):
     if x != None:
         print("Resetting the global variables.")
         object_poses = {}
-        List_name = []
+        list_name = []
         x = None
         y = None
         z = None
@@ -123,7 +123,7 @@ def get_poses(init_node=True):
     print("\n",object_poses)
     print(len(object_poses))
 
-    return object_poses,List_name
+    return object_poses,list_name
 
 
 if __name__ == '__main__':

@@ -525,36 +525,8 @@ def precise_Grasp():
             print("Trying solving without playing path for simulation ...")
 
 #______________________________Utility_funtions______________________________
-            
-def clean_path_vector():
-    # Cleaning the path vector
-    number_of_path = ps.numberPaths() #getting the number of path
-    print("Number of paths : ",number_of_path)
-    if number_of_path > 0:
-        print("Cleaning the path vector.")
-        # Erasing every vector in the vector path
-        for i in range(number_of_path):
-            ps.erasePath(number_of_path - i - 1)
-            sys.stdout.write("[INFO] Erasing path number %d.\n" % (number_of_path - i - 1))
-            sys.stdout.flush()
-    else:
-        print("No path to clean.")
-     
-def detect_and_grasp():
-    print("[INFO] Getting objects poses.")
-    dict_of_poses, list_of_names = get_poses(False)
 
-def dict_to_list_poses(dict_of_poses,list_of_name):
-    list_of_poses = []
-    list_var = ['x','y','z','theta x','theta y','theta z','theta w']
-    nb_of_obj = len(dict_of_poses)
-    for i in range(nb_of_obj):
-        list_of_poses.append([])
-        for j in range(7):
-            list_of_poses.append(dict_of_poses[list_of_name[i]][list_var[j]])
-    return list_of_poses
-
-def move_robot():
+def benchmark_pandas():
     keep_moving = True
 
     while keep_moving:
@@ -585,12 +557,11 @@ def move_robot():
         to have the gripper 10 cm above the surface -> z = 0.081255
         to have the gripper x cm above the surface -> x = x - 0.081255
         to have the camera x cm above the object -> x = x- 0.081255 - 0.175
-
         """
 
-        distance_from_table = int(input("How many cm do you want the gripper to have above the object ? "))/100 - 0.09875 - 0.175 # Distance of the object from the table
-        distance = distance_from_table + 0.76
-        q_init[11] = distance
+        distance = int(input("How many cm do you want the gripper to have above the object ? ")) # Distance in cm
+        distance_from_table = distance/100 - 0.09875 - 0.175 + 0.76  # Distance of the object from the table
+        q_init[11] = distance_from_table
 
         found, msg = robot.isConfigValid(q_init)
 
@@ -611,54 +582,181 @@ def move_robot():
         
         motion = input("Do you want to play the movement ? [y/n] : ")
         if motion == 'y':
-            path_id = ps.numberPaths()
-            cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
-            input("Press Enter to start the movement ...")
-            cc.playPath(path_id - 1,collect_data = False)
-            if not cc.errorOccured:
-                print("Ran {}".format(path_id))
+            move_robot()
 
-        capture = input("Do you want to capture the camera POV ? [y/n] :")
+        capture = input("Do you want to capture the camera POV ? [y/n/alt] :")
         if capture == 'y':
             try:
-                capture_camera()
+                capture_camera(10)
             except:
                 print("[WARN] The camera channel might not be on the port 2. Try with a different port.")
                 wrong_port = True
                 while wrong_port:
                     cam_id = int(input("Channel : "))
                     try:
-                        capture_camera(cam_id)
+                        capture_camera(10, cam_id)
                         wrong_port = False
                     except:
                         print("Wrong port again. If you see this message too much, the error might be something else.")
+                        print("If the error says that the camera cannot be open by index, close all the usb camera process (eg. roslaunch realsense2_camera and retry.")
                         again = input("Try again ? [y/n] : ")
                         if again == 'n':
                             wrong_port = False
 
-        
+        if capture == 'alt':
+            try:
+                capture_camera_alt(10)
+            except:
+                print("[WARN] The camera channel might not be on the port 2. Try with a different port.")
+                wrong_port = True
+                while wrong_port:
+                    cam_id = int(input("Channel : "))
+                    try:
+                        capture_camera_alt(10, cam_id)
+                        wrong_port = False
+                    except:
+                        print("Wrong port again. If you see this message too much, the error might be something else.")
+                        print("If the error says that the camera cannot be open by index, close all the usb camera process (eg. roslaunch realsense2_camera and retry.")
+                        again = input("Try again ? [y/n] : ")
+                        if again == 'n':
+                            wrong_port = False
+
+        cosypose = input("Do you want to run Cosypose ? [y/n] : ")
+        if cosypose == 'y':
+            run_cosypose()
+
         erase = input("Erasing the path vector ? [y/n] : ")
         if erase == 'y':
             clean_path_vector()
         
         moving = input("Do you want to move the robot again ? [y/n] : ")
-        
         if moving == 'n':
             keep_moving = False
 
     return q_init
 
-def capture_camera(cam_id = 2):
+def move_robot():
+    path_id = ps.numberPaths()
+    cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
+    input("Press Enter to start the movement ...")
+    cc.playPath(path_id - 1,collect_data = False)
+    if not cc.errorOccured:
+        print("Ran {}".format(path_id))
+
+def clean_path_vector():
+    # Cleaning the path vector
+    number_of_path = ps.numberPaths() #getting the number of path
+    print("Number of paths : ",number_of_path)
+    if number_of_path > 0:
+        print("Cleaning the path vector.")
+        # Erasing every vector in the vector path
+        for i in range(number_of_path):
+            ps.erasePath(number_of_path - i - 1)
+            sys.stdout.write("[INFO] Erasing path number %d.\n" % (number_of_path - i - 1))
+            sys.stdout.flush()
+    else:
+        print("No path to clean.")
+
+def capture_camera(nb_cap = 1, cam_id = 2, distance = ""):
     print("[INFO] Opening camera channel on port",cam_id,".")
     cam = cv2.VideoCapture(cam_id) # default camera port is 2
-    result, image = cam.read()
+    dir_path = os.getcwd() + '/temp'
     print("To close camera stream, press Q.")
-    if result:
-        cv2.imshow("camera capture", image)
-        cv2.imwrite("/home/dbaudu/Downloads/test.png", image)
-        cv2.waitKey(0)
-        cv2.destroyWindow("camera capture")
-    return image
+    for k in range(nb_cap):
+        result, image = cam.read()
+        name_img = str("image_"+str(k)+"_"+str(distance)+".png")
+        name = str(dir_path+"/"+name_img)
+        if result:
+            cv2.imshow("camera capture", image)
+            cv2.imwrite(name, image)
+            cv2.waitKey(0)
+            cv2.destroyWindow("camera capture")
+            print("Image captured. Saved under %s as %s." %(dir_path,name_img))
+        else:
+            print("Error while capturing the image.")
+
+def capture_camera_alt(nb_cap = 1, cam_id = 2):
+    print("[INFO] Opening camera channel on port",cam_id,".")
+    cam = cv2.VideoCapture(cam_id) # default camera port is 2
+    dir_path = os.getcwd() + '/temp'
+    print("capture_camera_alt is running on realsense ros. Please assure that 'roslaunch realsense2_camera rs_camera.launch' is running.")
+    try:
+        rospy.init_node("inference_on_camera_image", anonymous=True)
+        for k in range(nb_cap):
+            name_img = str("image_"+str(k)+".png")
+            name = str(dir_path+"/"+name_img)
+            print("Waiting to capture image from camera stream")
+            image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
+            bridge = CvBridge()
+            image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
+            cv2.imwrite(name, image)
+            print("Image captured. Saved under %s as %s." %(dir_path,name_img))
+
+    except:
+        print("Error while capturing the image.")
+
+def run_cosypose():
+    nb_obj = service_call()
+    print(nb_obj,"objects detected by the service")
+
+    essaie = 0
+    found = False
+    ri = RosInterface(robot)
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+    filepath = os.getcwd() + '/temp'
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+    file = open(filepath + '/poses.txt','a')
+
+    for i in range(nb_obj):
+        # Starting ROS cosypose detection process
+        ros_process = Process(target=service_call)
+        ros_process.start()
+        
+        q_init, wMo = ri.getObjectPose(q_init)
+
+        ros_process.terminate()
+
+        poses = np.array(q_init[9:16])
+        rotation_matrix = np.array(wMo)
+        transformation_matrix = np.zeros((4,4))
+        transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
+        transformation_matrix[:3,3] = poses[4:7]
+        transformation_matrix[3,3] = 1
+
+        print("\nPose of the object : \n",poses,"\n")
+        # print("\n Transformation matrix : \n",transformation_matrix,"\n")
+
+        file.write(str(poses)+"\n")
+
+    file.close()
+     
+def detect():
+    print("[INFO] Getting objects poses.")
+    dict_of_poses, list_of_names = get_poses(False)
+    list_of_poses = dict_to_list_poses(dict_of_poses,list_of_names)
+    write_poses_in_file(list_of_poses)
+
+def dict_to_list_poses(dict_of_poses,list_of_name):
+    list_of_poses = []
+    list_var = ['x','y','z','theta x','theta y','theta z','theta w']
+    nb_of_obj = len(dict_of_poses)
+    for i in range(nb_of_obj):
+        list_of_poses.append([])
+        for j in range(7):
+            list_of_poses.append(dict_of_poses[list_of_name[i]][list_var[j]])
+    return list_of_poses
+
+def write_poses_in_file(list):
+    if len(list) > 0:
+        filepath = os.getcwd() + '/temp'
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        file = open(filepath + '/poses.txt','a')
+        file.write(str(list))
+        file.close()
+
 #____________________________________________________________________________
 
 
