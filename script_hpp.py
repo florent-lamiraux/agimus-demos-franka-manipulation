@@ -584,7 +584,7 @@ def benchmark_pandas():
         if motion == 'y':
             move_robot()
 
-        capture = input("Do you want to capture the camera POV ? [y/n/alt] :")
+        capture = input("Do you want to capture the camera POV ? [y/n/alt] : ")
         if capture == 'y':
             try:
                 capture_camera(10)
@@ -605,7 +605,7 @@ def benchmark_pandas():
 
         if capture == 'alt':
             try:
-                capture_camera_alt(10)
+                capture_camera_alt(10,distance)
             except:
                 print("[WARN] The camera channel might not be on the port 2. Try with a different port.")
                 wrong_port = True
@@ -623,7 +623,7 @@ def benchmark_pandas():
 
         cosypose = input("Do you want to run Cosypose ? [y/n] : ")
         if cosypose == 'y':
-            run_cosypose()
+            run_cosypose(True,True,distance)
 
         erase = input("Erasing the path vector ? [y/n] : ")
         if erase == 'y':
@@ -657,14 +657,14 @@ def clean_path_vector():
     else:
         print("No path to clean.")
 
-def capture_camera(nb_cap = 1, cam_id = 2, distance = ""):
+def capture_camera(nb_cap = 1, cam_id = 2, distance = 0):
     print("[INFO] Opening camera channel on port",cam_id,".")
     cam = cv2.VideoCapture(cam_id) # default camera port is 2
     dir_path = os.getcwd() + '/temp'
     print("To close camera stream, press Q.")
     for k in range(nb_cap):
         result, image = cam.read()
-        name_img = str("image_"+str(k)+"_"+str(distance)+".png")
+        name_img = str("image_"+str(k)+"_"+str(distance)+"cm.png")
         name = str(dir_path+"/"+name_img)
         if result:
             cv2.imshow("camera capture", image)
@@ -675,15 +675,21 @@ def capture_camera(nb_cap = 1, cam_id = 2, distance = ""):
         else:
             print("Error while capturing the image.")
 
-def capture_camera_alt(nb_cap = 1, cam_id = 2):
-    print("[INFO] Opening camera channel on port",cam_id,".")
-    cam = cv2.VideoCapture(cam_id) # default camera port is 2
+def capture_camera_alt(nb_cap = 1, distance = 0):
     dir_path = os.getcwd() + '/temp'
     print("capture_camera_alt is running on realsense ros. Please assure that 'roslaunch realsense2_camera rs_camera.launch' is running.")
+    
+    # Initializing ROS node
     try:
         rospy.init_node("inference_on_camera_image", anonymous=True)
+    except:
+        print("Error initializing the ros node.")
+        print("You can still capture camera shot.")
+    
+    # Capturing Video stream through ROS
+    try:
         for k in range(nb_cap):
-            name_img = str("image_"+str(k)+".png")
+            name_img = str("image_"+str(k)+"_"+str(distance)+"cm.png")
             name = str(dir_path+"/"+name_img)
             print("Waiting to capture image from camera stream")
             image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
@@ -691,46 +697,54 @@ def capture_camera_alt(nb_cap = 1, cam_id = 2):
             image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
             cv2.imwrite(name, image)
             print("Image captured. Saved under %s as %s." %(dir_path,name_img))
-
     except:
-        print("Error while capturing the image.")
+        print("Error in the for loop")
 
-def run_cosypose():
-    nb_obj = service_call()
-    print(nb_obj,"objects detected by the service")
-
-    essaie = 0
-    found = False
+def run_cosypose(capture = False, get_height = False, distance = 0):
+    run_cosy = True
+    id = 0
     ri = RosInterface(robot)
     q_init = ri.getCurrentConfig(q0)
     res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+
     filepath = os.getcwd() + '/temp'
     if not os.path.exists(filepath):
         os.makedirs(filepath)
     file = open(filepath + '/poses.txt','a')
+    file_height = open(filepath + '/poses_height.txt','a')
+    file_height.write(str(distance)+"cm\n")
 
-    for i in range(nb_obj):
-        # Starting ROS cosypose detection process
-        ros_process = Process(target=service_call)
-        ros_process.start()
-        
-        q_init, wMo = ri.getObjectPose(q_init)
+    while run_cosy:
+        if capture:
+            capture_camera_alt(1,str(id) + str(distance))
+            id += 1
+        nb_obj = service_call()
+        print(nb_obj,"objects detected by the service")
+        for i in range(nb_obj):
+            # Starting ROS cosypose detection process
+            ros_process = Process(target=service_call)
+            ros_process.start()
+            
+            q_init, wMo = ri.getObjectPose(q_init)
 
-        ros_process.terminate()
+            ros_process.terminate()
 
-        poses = np.array(q_init[9:16])
-        rotation_matrix = np.array(wMo)
-        transformation_matrix = np.zeros((4,4))
-        transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
-        transformation_matrix[:3,3] = poses[4:7]
-        transformation_matrix[3,3] = 1
+            poses = np.array(q_init[9:16])
+            print("\nPose of the object : \n",poses,"\n")
 
-        print("\nPose of the object : \n",poses,"\n")
-        # print("\n Transformation matrix : \n",transformation_matrix,"\n")
+            if get_height:
+                file_height.write(str(poses[2])+"\n")
+            file.write(str(poses)+"\n")
 
-        file.write(str(poses)+"\n")
+        still_run_cosy = input("Run Cosypose again ? [y/n] : ")
+        if still_run_cosy == 'n':
+            run_cosy = False
 
+    file.write("\n")
     file.close()
+    file_height.write("\n")
+    file_height.close
+
      
 def detect():
     print("[INFO] Getting objects poses.")
@@ -753,7 +767,7 @@ def write_poses_in_file(list):
         filepath = os.getcwd() + '/temp'
         if not os.path.exists(filepath):
             os.makedirs(filepath)
-        file = open(filepath + '/poses.txt','a')
+        file = open(filepath + '/poses_from_tf.txt','a')
         file.write(str(list))
         file.close()
 
