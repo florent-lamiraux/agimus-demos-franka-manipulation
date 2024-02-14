@@ -689,12 +689,17 @@ def capture_camera_alt(nb_cap = 1, distance = 0):
     # Capturing Video stream through ROS
     try:
         for k in range(nb_cap):
-            name_img = str("image_"+str(k)+"_"+str(distance)+"cm.png")
+            if distance == 0:
+                name_img = str("image_" + str(k) + "_" + str(distance) + "cm.png")
+            else:
+                name_img = str("image_" + str(distance) + ".png")
+            print(name_img)
             name = str(dir_path+"/"+name_img)
             print("Waiting to capture image from camera stream")
             image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
             bridge = CvBridge()
             image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
+            print("[INFO] Saving the image ...")
             cv2.imwrite(name, image)
             print("Image captured. Saved under %s as %s." %(dir_path,name_img))
     except:
@@ -715,9 +720,9 @@ def run_cosypose(capture = False, get_height = False, distance = 0):
     file_height.write(str(distance)+"cm\n")
 
     while run_cosy:
+        id += 1
         if capture:
-            capture_camera_alt(1,str(id) + str(distance))
-            id += 1
+            capture_camera_alt(1,str(distance) + "cm_" + str(id))
         nb_obj = service_call()
         print(nb_obj,"objects detected by the service")
         for i in range(nb_obj):
@@ -736,6 +741,7 @@ def run_cosypose(capture = False, get_height = False, distance = 0):
                 file_height.write(str(poses[2])+"\n")
             file.write(str(poses)+"\n")
 
+        print("Run number",id)
         still_run_cosy = input("Run Cosypose again ? [y/n] : ")
         if still_run_cosy == 'n':
             run_cosy = False

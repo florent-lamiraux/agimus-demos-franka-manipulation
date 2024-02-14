@@ -79,19 +79,24 @@ def pose_getter():
     return list_pose
 
 
-def service_call():
+def service_call(Tless_1_and_2 = False):
     print("[START] Starting the happypose service call.")
     call = get_number_of_objects()
     nb_obj = 0
     if call != None:
         list_obj = convert_std_msg_to_array(call)
-        for el in list_obj:
-            nb_obj += el
+        if Tless_1_and_2:
+            print("[INFO] Counting object_tless_1 and object_tless_2 ...")
+            nb_obj = list_obj[1] + list_obj[2]
+        else:
+            print("[INFO] Counting all the object ...")
+            for el in list_obj:
+                nb_obj += el
         print("Number of objects :",nb_obj)
     else:
         print("No object detected or the service call failed.")
     return nb_obj
 
 if __name__ == '__main__':
-    rospy.init_node('service')
+    rospy.init_node('service')  
     list_pose = service_call()
