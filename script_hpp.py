@@ -28,7 +28,7 @@ from math import pi, sqrt
 from hpp.corbaserver import loadServerPlugin, shrinkJointRange
 from hpp.corbaserver.manipulation import Robot, \
     createContext, newProblem, ProblemSolver, ConstraintGraph, \
-    ConstraintGraphFactory, CorbaClient, SecurityMargins
+    ConstraintGraphFactory, CorbaClient, SecurityMargins, Constraints
 from hpp.gepetto.manipulation import ViewerFactory
 from hpp.corbaserver import wrap_delete
 from tools_hpp import displayGripper, displayHandle, generateTargetConfig, \
@@ -64,6 +64,8 @@ from happypose.toolbox.utils.logging import get_logger, set_logging_level
 
 from agimus_demos.tools_hpp import concatenatePaths
 from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
+from agimus_demos.calibration import HandEyeCalibration as Calibration
+from hpp.corbaserver.manipulation import ConstraintGraphFactory as Factory
 
 logger = get_logger(__name__)
 
@@ -723,7 +725,7 @@ def run_cosypose(capture = False, get_height = False, distance = 0):
         id += 1
         if capture:
             capture_camera_alt(1,str(distance) + "cm_" + str(id))
-        nb_obj = service_call()
+        nb_obj = service_call(True)
         print(nb_obj,"objects detected by the service")
         for i in range(nb_obj):
             # Starting ROS cosypose detection process
@@ -751,7 +753,109 @@ def run_cosypose(capture = False, get_height = False, distance = 0):
     file_height.write("\n")
     file_height.close
 
-     
+def poses_multi_view():
+    # Initializing calibration to generate paths
+    graph = binPicking.graph
+    factory = Factory(graph)
+    c = Calibration(ps, graph, factory)
+    c.camera_frame = "camera_color_optical_frame"
+    c.robot_name='pandas'
+    c.addStateToConstraintGraph()
+
+    # Connecting to robot
+    connectedToRos = True
+    if connectedToRos:
+        ri = RosInterface(robot)
+        q = ri.getCurrentConfig(q0)
+    else:
+        q = q0[:]
+
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+    path = c.generateConfigurationsAndPaths(q_init, 10)
+
+def test_calib():
+    class CalibrationChessboard:
+        urdfFilename = "package://agimus_demos/urdf/chessboard_10x7_27mm.urdf"
+        srdfFilename = ""
+        rootJointType = "freeflyer"
+    try:
+        import rospy
+        Robot.urdfString = rospy.get_param('robot_description')
+        print("reading URDF from ROS param")
+        connectedToRos = True
+    except:
+        print("reading generic URDF")
+        from hpp.rostools import process_xacro, retrieve_resource
+        Robot.urdfString = process_xacro\
+        ("package://agimus_demos/franka/manipulation/urdf/demo.urdf.xacro")
+    Robot.srdfString = ""
+
+    defaultContext = "corbaserver"
+    loadServerPlugin (defaultContext, "manipulation-corba.so")
+    newProblem()
+
+    robot = Robot("robot", "pandas", rootJointType="anchor")
+    shrinkJointRange(robot, [f'pandas/panda2_joint{i}' for i in range(1,8)],0.95)
+    ps = ProblemSolver(robot)
+
+    ps.addPathOptimizer("EnforceTransitionSemantic")
+    ps.addPathOptimizer("SimpleTimeParameterization")
+    ps.setParameter('SimpleTimeParameterization/order', 2)
+    ps.setParameter('SimpleTimeParameterization/maxAcceleration', .5)
+    ps.setParameter('SimpleTimeParameterization/safety', 0.95)
+
+    # Add path projector to avoid discontinuities
+    ps.selectPathProjector ("Progressive", .05)
+    ps.selectPathValidation("Graph-Progressive", 0.01)
+    vf = ViewerFactory(ps)
+    vf.loadRobotModel (CalibrationChessboard, "part")
+
+    robot.setJointBounds('part/root_joint', [-1., 1., -1., 1., -0.8, 1.5])
+    print("Part loaded")
+
+    robot.client.manipulation.robot.insertRobotSRDFModel\
+        ("pandas", "package://agimus_demos/franka/manipulation/srdf/demo.srdf")
+
+    graph = ConstraintGraph(robot, 'graph')
+    factory = Factory(graph)
+    # Add a state in the constraint graph
+    factory.objects = ["part"]
+    factory.grippers = list()
+    factory.handlesPerObjects = [[]]
+    factory.contactsPerObjects = [[]]
+    factory.handles = list()
+    factory.generate()
+    c = Calibration(ps, graph, factory)
+    c.robot_name = "pandas"
+    c.camera_frame = "camera_color_optical_frame"
+    c.security_distance_robot_universe = 0.05
+    c.addStateToConstraintGraph()
+    q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
+        0.189, 0, 0.761, 0, 0, 0, 1]
+
+    # Lock gripper in open position.
+    ps.createLockedJoint('locked_finger_1', 'pandas/panda2_finger_joint1', [0.035])
+    ps.createLockedJoint('locked_finger_2', 'pandas/panda2_finger_joint2', [0.035])
+    ps.setConstantRightHandSide('locked_finger_1', True)
+    ps.setConstantRightHandSide('locked_finger_2', True)
+    graph.addConstraints(graph=True,
+                        constraints = Constraints(numConstraints =
+                            ['locked_finger_1', 'locked_finger_2']))
+    graph.initialize()
+    print("graph initialized")
+
+    if connectedToRos:
+        ri = RosInterface(robot)
+        q = ri.getCurrentConfig(q0)
+    else:
+        q = q0[:]
+
+    q_init = ri.getCurrentConfig(q0)
+    res, q_init, err = graph.applyNodeConstraints('free', q_init)
+    assert res
+    c.generateConfigurationsAndPaths(q_init,10)
+
 def detect():
     print("[INFO] Getting objects poses.")
     dict_of_poses, list_of_names = get_poses(False)
