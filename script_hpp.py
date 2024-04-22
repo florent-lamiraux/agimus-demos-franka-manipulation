@@ -34,13 +34,16 @@ from hpp.corbaserver import wrap_delete
 from tools_hpp import displayGripper, displayHandle, generateTargetConfig, \
     shootPartInBox, RosInterface
 from bin_picking import BinPicking
+from logging import getLogger
 
-import rospy, tf
+import rospy, tf2_ros
 import sys
 import os
 import numpy as np
 import cv2
 import torch
+import time
+
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Image, CameraInfo
 from cv_bridge import CvBridge
@@ -52,22 +55,12 @@ from happy_service_call import service_call
 from multiprocessing import Process, Queue
 from get_poses_from_tf import get_poses
 
-from happypose.toolbox.datasets.scene_dataset import CameraData, ObjectData
-from happypose.toolbox.datasets.object_dataset import RigidObject, RigidObjectDataset
-from happypose.toolbox.lib3d.transform import Transform
-from happypose.toolbox.renderer import Panda3dLightData
-from happypose.toolbox.renderer.panda3d_scene_renderer import Panda3dSceneRenderer
-from happypose.toolbox.utils.conversion import convert_scene_observation_to_panda3d
-from happypose.toolbox.visualization.bokeh_plotter import BokehPlotter
-from happypose.toolbox.visualization.utils import make_contour_overlay
-from happypose.toolbox.utils.logging import get_logger, set_logging_level
-
 from agimus_demos.tools_hpp import concatenatePaths
 from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
 from agimus_demos.calibration import HandEyeCalibration as Calibration
 from hpp.corbaserver.manipulation import ConstraintGraphFactory as Factory
 
-logger = get_logger(__name__)
+logger = getLogger(__name__)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -193,100 +186,9 @@ binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
 print("Generating goal configurations.")
 binPicking.generateGoalConfigs(q0)
 
-#___________________from_run_inference_on_exemple_COSYPOSE___________________
+#_______________END_OF_GRAPH_GENERATION_______________
 
-def make_object_dataset(example_dir: Path) -> RigidObjectDataset:
-    rigid_objects = []
-    mesh_units = "mm"
-    object_dirs = (example_dir / "meshes").iterdir()
-    print(object_dirs)
-    for object_dir in object_dirs:
-        label = object_dir.name
-        mesh_path = None
-        for fn in object_dir.glob("*"):
-            if fn.suffix in {".obj", ".ply"}:
-                assert not mesh_path, f"there multiple meshes in the {label} directory"
-                mesh_path = fn
-        assert mesh_path, f"couldnt find a obj or ply mesh for {label}"
-        rigid_objects.append(RigidObject(label=label, mesh_path=mesh_path, mesh_units=mesh_units))
-        # TODO: fix mesh units
-    rigid_object_dataset = RigidObjectDataset(rigid_objects)
-    return rigid_object_dataset
-
-def rendering(poses):
-    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
-    example_dir = Path(data_dir) / "examples/tless"
-
-    rgb = np.array(img_PIL.open("camera_view.png"), dtype=np.uint8)
-    camera_data = CameraData.from_json((example_dir / "camera_data.json").read_text())
-    camera_data.resolution = rgb.shape[:2]
-
-    object_dataset = make_object_dataset(example_dir)
-    camera_data.TWC = Transform(np.eye(4))
-    renderer = Panda3dSceneRenderer(object_dataset)
-    # Data necessary for image rendering
-    print(type(poses[0]))
-    print(type(poses[0].numpy()))
-    print(len(poses))
-    print("poses[0].shape : ", poses[0].shape)
-    print("poses.size() : ", poses.size())
-    print("poses[0].size() : ", poses[0].size())
-    object_datas = [ObjectData(label="tless", TWO=Transform(poses[0].numpy()))]
-    camera_data, object_datas = convert_scene_observation_to_panda3d(camera_data, object_datas)
-    light_datas = [
-        Panda3dLightData(
-            light_type="ambient",
-            color=((0.6, 0.6, 0.6, 1)),
-        ),
-    ]
-    renderings = renderer.render_scene(
-        object_datas,
-        [camera_data],
-        light_datas,
-        render_depth=False,
-        render_binary_mask=False,
-        render_normals=False,
-        copy_arrays=True,
-    )[0]
-    return renderings
-
-def save_predictions(renderings):
-    data_dir = os.getenv("MEGAPOSE_DATA_DIR")
-    example_dir = Path(data_dir) / "examples/tless"
-    rgb_render = renderings.rgb
-    rgb = np.array(img_PIL.open("camera_view.png"), dtype=np.uint8)
-    mask = ~(rgb_render.sum(axis=-1) == 0)
-    alpha = 0.1
-    rgb_n_render = rgb.copy()
-    rgb_n_render[mask] = rgb_render[mask]
-
-    print("save prediction")
-
-    # make the image background a bit fairer than the render
-    rgb_overlay = np.zeros_like(rgb_render)
-    rgb_overlay[~mask] = rgb[~mask] * 0.6 + 255 * 0.4
-    rgb_overlay[mask] = rgb_render[mask] * 0.8 + 255 * 0.2
-    plotter = BokehPlotter()
-
-    fig_rgb = plotter.plot_image(rgb)
-
-    fig_mesh_overlay = plotter.plot_overlay(rgb, renderings.rgb)
-    contour_overlay = make_contour_overlay(
-        rgb, renderings.rgb, dilate_iterations=1, color=(0, 255, 0)
-    )["img"]
-    fig_contour_overlay = plotter.plot_image(contour_overlay)
-    fig_all = gridplot([[fig_rgb, fig_contour_overlay, fig_mesh_overlay]], toolbar_location=None)
-    vis_dir = example_dir / "visualizations_hpp"
-    vis_dir.mkdir(exist_ok=True)
-    export_png(fig_mesh_overlay, filename=vis_dir / "mesh_overlay.png")
-    export_png(fig_contour_overlay, filename=vis_dir / "contour_overlay.png")
-    export_png(fig_all, filename=vis_dir / "all_results.png")
-    print("Images save in : ",vis_dir)
-
-#____________________________________________________________________________
-
-
-def GrabAndDrop(robot, ps, binPicking, render):
+def GrabAndDrop(robot, ps, binPicking, render=False):
     # Get configuration of the robot
     ri = None
 
@@ -301,24 +203,31 @@ def GrabAndDrop(robot, ps, binPicking, render):
     # Detecting the object poses
     found = False
     essaie = 0
-    q_init, wMo = ri.getObjectPose(q_init)
+
+    #____________GETTING_THE_POSE____________
+    test_config = False
+    input_config = True
+
+    if test_config:
+        q_sim = [0.2077, 0.2109, 0.8202, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
+        q_init, wMo = q_init,None
+        q_init[9:16] = q_sim
+    if input_config:
+        q_input = input("Enter the XYZQUAT : ")
+        q_init[9:16], wMo =  q_input, None
+    else:
+        q_init, wMo = ri.getObjectPose(q_init)
+    #________________________________________
 
     poses = np.array(q_init[9:16])
-    rotation_matrix = np.array(wMo)
-    transformation_matrix = np.zeros((4,4))
-    transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
-    transformation_matrix[:3,3] = poses[4:7]
-    transformation_matrix[3,3] = 1
+    # rotation_matrix = np.array(wMo)
+    # transformation_matrix = np.zeros((4,4))
+    # transformation_matrix[:3,:3] = rotation_matrix[:3,:3]
+    # transformation_matrix[:3,3] = poses[0:3]
+    # transformation_matrix[3,3] = 1
 
     print("\nPose of the object : \n",poses,"\n")
     # print("\n Transformation matrix : \n",transformation_matrix,"\n")
-
-    if render:
-        print("Rendering the detection on image ...")
-        transformation_matrix = torch.tensor([transformation_matrix])
-        renderings = rendering(transformation_matrix)
-        save_predictions(renderings)
-        print("Render finished !")
 
     while not found and essaie < 25:
         found, msg = robot.isConfigValid(q_init)
@@ -341,7 +250,7 @@ def GrabAndDrop(robot, ps, binPicking, render):
         print("[INFO] Object found but not collision free")
         print("Trying solving without playing path for simulation ...")
 
-    return q_init
+    return q_init,None
 
 def multiple_GrabAndDrop():
     print("Begining of bin picking.")
@@ -586,6 +495,10 @@ def benchmark_pandas():
         if motion == 'y':
             move_robot()
 
+        show_config = input("Do you want to see the config ? [y/n] : ")
+        if show_config == 'y':
+            print(ri.getCurrentConfig(q_init))
+
         capture = input("Do you want to capture the camera POV ? [y/n/alt] : ")
         if capture == 'y':
             try:
@@ -626,6 +539,53 @@ def benchmark_pandas():
         cosypose = input("Do you want to run Cosypose ? [y/n] : ")
         if cosypose == 'y':
             run_cosypose(True,True,distance)
+
+        erase = input("Erasing the path vector ? [y/n] : ")
+        if erase == 'y':
+            clean_path_vector()
+        
+        moving = input("Do you want to move the robot again ? [y/n] : ")
+        if moving == 'n':
+            keep_moving = False
+
+    return q_init
+
+def multiview_benchmark():
+    keep_moving = True
+
+    while keep_moving:
+        ri = RosInterface(robot)
+        q_init = ri.getCurrentConfig(q0)
+        res, q_init, err = binPicking.graph.applyNodeConstraints('free', q_init)
+
+        distance = int(input("How many cm do you want the gripper to have above the object ? ")) # Distance in cm
+        distance_from_table = distance/100 - 0.09875 - 0.175 + 0.76  # Distance of the object from the table
+        q_init[11] = distance_from_table
+
+        found, msg = robot.isConfigValid(q_init)
+
+        if found:
+            print("[INFO] Object found with no collision")
+            print("Solving ...")
+            res = False
+            res, p = binPicking.solve(q_init, 'direct_path')
+            if res:
+                ps.client.basic.problem.addPath(p)
+                print("Path generated.")
+            else:
+                print(p)
+
+        else:
+            print("[INFO] Object found but not collision free")
+            print("Returning goal configuration for simulation ...")
+        
+        motion = input("Do you want to play the movement ? [y/n] : ")
+        if motion == 'y':
+            move_robot()
+
+        acquire_data = input("Do you want to get the data ? [y/n] : ")
+        if acquire_data == 'y':
+            data_acquisition()
 
         erase = input("Erasing the path vector ? [y/n] : ")
         if erase == 'y':
@@ -691,10 +651,10 @@ def capture_camera_alt(nb_cap = 1, distance = 0):
     # Capturing Video stream through ROS
     try:
         for k in range(nb_cap):
-            if distance == 0:
+            if distance != 0:
                 name_img = str("image_" + str(k) + "_" + str(distance) + "cm.png")
             else:
-                name_img = str("image_" + str(distance) + ".png")
+                name_img = str("image_" + str(time.time()) + ".png")
             print(name_img)
             name = str(dir_path+"/"+name_img)
             print("Waiting to capture image from camera stream")
@@ -970,11 +930,109 @@ def write_poses_in_file(list):
         file.write(str(list))
         file.close()
 
+def quat2SE3(quaternion):
+    r = R.from_quat(quaternion[3:7])
+
+    rotation_matrix = np.array(r.as_matrix())
+    transformation_matrix = np.zeros((4,4))
+    transformation_matrix[:3,:3] = rotation_matrix
+    transformation_matrix[:3,3] = quaternion[0:3]
+    transformation_matrix[3,3] = 1
+
+    return transformation_matrix, quaternion
+
+def get_cam_pose():
+    try:
+        rospy.init_node("inference_on_camera_image", anonymous=True)
+    except:
+        print("Ros node already initialized")
+    tfBuffer = tf2_ros.Buffer()
+    listener = tf2_ros.TransformListener(tfBuffer)
+    found = False
+    out_of_time = False
+    timer_in = time.time()
+    timer_out = timer_in + 30
+    while not found and not out_of_time:
+        if tfBuffer.can_transform('camera_color_optical_frame', 'world', rospy.Time()):
+            msg = tfBuffer.lookup_transform('camera_color_optical_frame', 'world', rospy.Time())
+            x = msg.transform.translation.x
+            y = msg.transform.translation.y
+            z = msg.transform.translation.z
+            theta_x = msg.transform.rotation.x
+            theta_y = msg.transform.rotation.y
+            theta_z = msg.transform.rotation.z
+            theta_w = msg.transform.rotation.w
+            cam_pose = [x, y, z, theta_x, theta_y, theta_z, theta_w]
+            found = True
+            print("cam pose :", cam_pose)
+        if time.time() >= timer_out:
+            out_of_time = True
+            print("Runing out of time.")
+            cam_pose = None
+        time.sleep(1)
+        print(int(time.time()-timer_in))
+
+    return cam_pose
+
+def capture_camera_image():
+    dir_path = os.getcwd() + '/multiview/multiview_tless_2/images'
+    print("capture_camera_image_and_pose is running on realsense ros. Please assure that 'roslaunch realsense2_camera rs_camera.launch' is running.")
+    
+    # Initializing ROS node
+    try:
+        rospy.init_node("inference_on_camera_image", anonymous=True)
+        print("[INFO] Ros node initialized.")
+    except:
+        print("Error initializing the ros node.")
+        print("You can still capture camera shot.")
+    
+    # Capturing Video stream through ROS
+    # try:
+    for k in range(10):
+        if not os.path.exists(str(dir_path+"/"+'0'+str(k+1)+'.png')):
+            name_img = str('0'+str(k+1)+'.png')
+    name = str(dir_path+"/"+name_img)
+    print("Waiting to capture image from camera stream")
+    image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
+    bridge = CvBridge()
+    image = bridge.imgmsg_to_cv2(image_msg, desired_encoding='passthrough')
+    print("[INFO] Saving the image ...")
+    cv2.imwrite(name, image)
+    print("Image captured. Saved under %s as %s." %(dir_path,name_img))
+    return image, name_img
+    # except:
+    #     print("Error in the for loop")
+    #     return None, None
+
+def data_acquisition(nb=10):
+    print("The script will run",nb,"times. For each iteration, move the robot to the desired configuration then press ENTER.")
+    for k in range(nb):
+        input("Press ENTER to proceed with the data acquisition "+ str(k+1) +" ...")
+        cam_pose_quat = get_cam_pose()
+        img = capture_camera_image()
+        list_of_cam_pose[k] = quat2SE3(cam_pose_quat)[0]
+        list_of_images[k] = img[0]
+        q = ri.getCurrentConfig(q_start)
+        list_of_q[k] = q[0:7]
+    
+    if not os.path.exists('multiview_data'):
+        os.makedirs('multiview_data')
+    
+    print("Data saved in",os.getcwd()+'/multiview_data')
+    np.save("multiview_data/color_img.npy",list_of_images)
+    np.save("multiview_data/cam_poses.npy",list_of_cam_pose)
+    np.save("multiview_data/q.npy",list_of_q)
+
 #____________________________________________________________________________
 
 
 if __name__ == '__main__':
     print("Script HPP ready !")
     q_start = RosInterface(robot).getCurrentConfig(q0)
+    ri = RosInterface(robot)
+
+    list_of_cam_pose= np.zeros(shape=(10,4,4))
+    list_of_images = np.zeros(shape=(10,720,1280,3),dtype=np.uint8)
+    list_of_q = np.zeros(shape=(10,7))
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
     # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)
