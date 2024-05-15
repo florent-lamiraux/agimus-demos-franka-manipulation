@@ -43,6 +43,7 @@ import numpy as np
 import cv2
 import torch
 import time
+import ast
 
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Image, CameraInfo
@@ -214,6 +215,7 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
         q_init[9:16] = q_sim
     if input_config:
         q_input = input("Enter the XYZQUAT : ")
+        q_input = ast.literal_eval(q_input)
         q_init[9:16], wMo =  q_input, None
     else:
         q_init, wMo = ri.getObjectPose(q_init)
@@ -470,7 +472,7 @@ def benchmark_pandas():
         to have the camera x cm above the object -> x = x- 0.081255 - 0.175
         """
 
-        distance = int(input("How many cm do you want the gripper to have above the object ? ")) # Distance in cm
+        distance = float(input("How many cm do you want the gripper to have above the object ? ")) # Distance in cm
         distance_from_table = distance/100 - 0.09875 - 0.175 + 0.76  # Distance of the object from the table
         q_init[11] = distance_from_table
 
@@ -976,6 +978,10 @@ def get_cam_pose():
 
 def capture_camera_image():
     dir_path = os.getcwd() + '/multiview/multiview_tless_2/images'
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
+        print("[INFO] Folder created")
+
     print("capture_camera_image_and_pose is running on realsense ros. Please assure that 'roslaunch realsense2_camera rs_camera.launch' is running.")
     
     # Initializing ROS node
@@ -988,9 +994,13 @@ def capture_camera_image():
     
     # Capturing Video stream through ROS
     # try:
+    name_img = str(dir_path+"image_" + str(time.time()) + ".png")
     for k in range(10):
         if not os.path.exists(str(dir_path+"/"+'0'+str(k+1)+'.png')):
             name_img = str('0'+str(k+1)+'.png')
+            break
+        else:
+            print("test not ok for index ",k)
     name = str(dir_path+"/"+name_img)
     print("Waiting to capture image from camera stream")
     image_msg = rospy.wait_for_message("/camera/color/image_raw", Image)
@@ -1022,6 +1032,18 @@ def data_acquisition(nb=10):
     np.save("multiview_data/color_img.npy",list_of_images)
     np.save("multiview_data/cam_poses.npy",list_of_cam_pose)
     np.save("multiview_data/q.npy",list_of_q)
+
+def add_tless_to_scene(name, poses):
+    from gepetto.corbaserver import Client
+
+    c = Client()
+    c.gui.addMesh(name, '/home/dbaudu/devel/src/agimus-demos/franka/manipulation/urdf/t-less/obj_01.urdf')
+    c.gui.addToGroup(name, 'scene_hpp_')
+    c.gui.setScale(name, [0.001, 0.001, 0.001])
+    c.gui.applyConfiguration(name, poses)
+    print("[INFO] Add object", name, "to the scene.")
+
+    c.gui.refresh()
 
 #____________________________________________________________________________
 

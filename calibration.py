@@ -120,4 +120,5 @@ else:
 q_init = ri.getCurrentConfig(q0)
 res, q_init, err = graph.applyNodeConstraints('free', q_init)
 assert res
-c.generateConfigurationsAndPaths(q_init, 30)
+c.generateConfigurationsAndPaths(q_init, 20)
+# c.generateConfigurationsAndPaths(q_init, 30)
