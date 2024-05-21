@@ -1,3 +1,7 @@
+# Troubleshoooting
+
+If you encounter computer slowing down are freeze, restart the process hppcorbaserver.
+
 # Instructions to run the demo
 
 1. connect to the ip adress of the robot using firefox. On akasan, this

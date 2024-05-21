@@ -44,6 +44,7 @@ import cv2
 import torch
 import time
 import ast
+import bridge_transform as btf
 
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import Image, CameraInfo
@@ -69,7 +70,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 os.environ["EGL_VISIBLE_DEVICES"] = "-1"
 
 print("[START]")
-print("To avoid crash during constrain graph building, kill the hppcorbaserver process once in a while.")
+print("To avoid crash during constrain graph building, RESTART the hppcorbaserver process once in a while.")
 
 connectedToRos = True
 
@@ -207,7 +208,10 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
 
     #____________GETTING_THE_POSE____________
     test_config = False
-    input_config = True
+    input_config = False
+    ros_bridge_config = True
+
+    # quaternion is X, Y, Z, W
 
     if test_config:
         q_sim = [0.2077, 0.2109, 0.8202, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
@@ -217,6 +221,11 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
         q_input = input("Enter the XYZQUAT : ")
         q_input = ast.literal_eval(q_input)
         q_init[9:16], wMo =  q_input, None
+    if ros_bridge_config:
+        input("[INFO] Make sure the /happypose/detections ros topic exist !")
+        data = btf.run_pipeline()
+        q_bridge = [data[0].position.x, data[0].position.y, data[0].position.z, data[0].orientation.x, data[0].orientation.y, data[0].orientation.z, data[0].orientation.w]
+        q_init[9:16], wMo =  q_bridge, None
     else:
         q_init, wMo = ri.getObjectPose(q_init)
     #________________________________________

@@ -193,7 +193,7 @@ T_bo_dic_full = {}
 for label, T_wo in T_wo_dic_full.items():
     T_bo_dic_full[label] = T_bw_align.homogeneous @ T_wo
 
-# For rendering
+# For rendering______________________________________________________________
 T_wo_dic = {
     objects_pred.infos['label'][i]: objects_pred.tensors['TWO'][i].numpy()  
     for i in range(len(objects_pred.infos))
