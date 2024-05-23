@@ -6,6 +6,7 @@ import tf2_geometry_msgs
 
 from std_msgs.msg import String
 from vision_msgs.msg import Detection2DArray
+from pyquaternion import Quaternion
 
 class Object_Pose:
     def init(self, x, y, z, theta_x, theta_y, theta_z, theta_w):
@@ -21,16 +22,26 @@ class Object_Pose:
     def __str__(self):
         return f"Poses : \n x = {self.x}\n y = {self.y}\n z = {self.z}\n theta x = {self.theta_x}\n theta y = {self.theta_y}\n theta z = {self.theta_z}\n theta w = {self.theta_w}\n"
 
-    def isNormalize(self):
+    def isNormalize(self, to_normalize = False):
         normalized = False
+
         d = np.sqrt(self.theta_x**2 + self.theta_y**2 + self.theta_z**2 + self.theta_w**2)
         norm = self.theta_x/d + self.theta_y/d + self.theta_z/d + self.theta_w/d
+
         if norm >=0.99 and norm <= 1.01:
             normalized = True
         if normalized:
             print("The object quaternion is normalzed (norm =", norm,")")
         if not normalized:
             print("The object quaternion is not normalzed(norm =", norm,")")
+        if to_normalize:
+            quaternion = Quaternion(x=self.theta_x, y=self.theta_y, z=self.theta_z, w=self.theta_w)
+            quaternion = Quaternion.normalised
+            self.theta_x = quaternion[0]
+            self.theta_y = quaternion[1]
+            self.theta_z = quaternion[2]
+            self.theta_w = quaternion[3]
+            self.quaternion = quaternion
 
     def show_quaternion(self):
         print("Object quaternion :",self.quaternion)
@@ -126,6 +137,8 @@ def get_transform(obj_id=0):
 
     print(pose_transformed.pose)
 
+    return pose_transformed.pose
+
 def get_transform_all():
     global object_message_list
     global tfBuffer
@@ -137,11 +150,8 @@ def get_transform_all():
 
     # Get the poses of all the objects in the world frame through tf_transform
     for obj_id in range(len(object_message_list)):
-        transform = tfBuffer.lookup_transform('world','camera_color_optical_frame', rospy.Time())
-        pose_transformed = tf2_geometry_msgs.do_transform_pose(object_message_list[obj_id].results[0].pose, transform)
-        pose_list.append(pose_transformed.pose)
-        print(pose_transformed.pose,'\n')
-    
+        transformed_pose = get_transform(obj_id)
+        pose_list.append(transformed_pose)
     return pose_list
 
 def run_pipeline():
