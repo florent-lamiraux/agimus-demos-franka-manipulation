@@ -216,17 +216,27 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
         q_input = ast.literal_eval(q_input)
         q_init[9:16], wMo =  q_input, None
     if ros_bridge_config:
-        input("[INFO] Make sure the /happypose/detections ros topic exist !")
+        print("[INFO] Make sure the /happypose/detections ros topic exist !")
+        input("Press [ENTER] to proceed ...")
         data = btf.run_pipeline()
-        quat = Quaternion([data[0].orientation.x, data[0].orientation.y, data[0].orientation.z, data[0].orientation.w])
+        max_Z = data[0].position.z
+        id = 0
+        for i in range(len(data)):
+            if data[i].position.z > max_Z:
+                id = i
+                max_Z = data[i].position.z
+                print(data[i].position.z,">",max_Z)
+        quat = Quaternion([data[id].orientation.x, data[id].orientation.y, data[id].orientation.z, data[id].orientation.w])
         quat = quat.normalised
-        q_bridge = [data[0].position.x, data[0].position.y, data[0].position.z,quat[0], quat[1], quat[2], quat[3]]
+        q_bridge = [data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]]
         q_init[9:16], wMo =  q_bridge, None
     else:
         q_init, wMo = ri.getObjectPose(q_init)
     #________________________________________
 
     poses = np.array(q_init[9:16])
+
+    print(q_init)
 
     print("\nPose of the object : \n",poses,"\n")
 
@@ -320,4 +330,3 @@ if __name__ == '__main__':
     list_of_images = np.zeros(shape=(10,720,1280,3),dtype=np.uint8)
     list_of_q = np.zeros(shape=(10,7))
     # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
-    # nb_obj, poses, infos = happypose_with_camera.get_nb_objects_in_image(0)

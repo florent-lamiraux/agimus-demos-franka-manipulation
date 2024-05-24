@@ -95,13 +95,13 @@ def select_objects(obj_name='tless-obj_000001'):
     global object_poses
     global object_message_list
 
+    object_message_list = []
     nb_obj = len(message.detections)
     obj_id = 0
 
     for i in range(nb_obj):
         data = message.detections[i].results[0]
         name = data.hypothesis.class_id
-        print(name)
 
         if obj_name in name:
             object_message_list.append(message.detections[i])
@@ -134,8 +134,6 @@ def get_transform(obj_id=0):
     # Get the poses of the object in the world frame through tf_transform
     transform = tfBuffer.lookup_transform('world','camera_color_optical_frame', rospy.Time())
     pose_transformed = tf2_geometry_msgs.do_transform_pose(object_message_list[obj_id].results[0].pose, transform)
-
-    print(pose_transformed.pose)
 
     return pose_transformed.pose
 
@@ -191,13 +189,6 @@ if __name__ == "__main__":
     # Global variable
     object_poses = {}
     name = None
-    # x = None
-    # y = None
-    # z = None
-    # theta_x = None
-    # theta_y = None
-    # theta_z = None
-    # theta_w = None
 
     # Create global variable for data message
     message = None
