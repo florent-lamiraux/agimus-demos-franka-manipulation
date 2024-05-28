@@ -166,6 +166,29 @@ binPicking.goalGrippers = ['goal/gripper1', 'goal/gripper2']
 binPicking.goalHandles = ["part/center1", "part/center2"]
 binPicking.handles = handles
 binPicking.graphConstraints = ['locked_finger_1', 'locked_finger_2']
+
+def disable_collision():
+    srdf_disable_collisions = """<robot>"""
+    srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_0",
+                                                                  "robot/part/base_link_0")
+    srdf_disable_collisions += "</robot>"
+    robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
+    print(srdf_disable_collisions)
+
+disable_collision()
+
+srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
+# Disable collision between tiago/hand_safety_box_0 and driller
+srdf_disable_collisions_test = """<robot>"""
+srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/base_link")
+srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_top")
+srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_back")
+srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_left")
+srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_top_horizontal")
+
+print(srdf_disable_collisions_test)
+
 print("Building constraint graph")
 binPicking.buildGraph()
 
@@ -201,17 +224,20 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
     essaie = 0
 
     #____________GETTING_THE_POSE____________
-    test_config = False
+    test_config = True
     input_config = False
-    ros_bridge_config = True
+    ros_bridge_config = False
 
     # quaternion is X, Y, Z, W
 
     if test_config:
-        q_sim = [0.2077, 0.2109, 0.8202, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
+        print("[INFO] Test config.")
+        q_sim = [0,0, 0.65, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
         q_init, wMo = q_init,None
+        print("test")
         q_init[9:16] = q_sim
     if input_config:
+        print("[INFO] Given config.")
         q_input = input("Enter the XYZQUAT : ")
         q_input = ast.literal_eval(q_input)
         q_init[9:16], wMo =  q_input, None
@@ -230,9 +256,12 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
         quat = quat.normalised
         q_bridge = [data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]]
         q_init[9:16], wMo =  q_bridge, None
-    else:
+    if not test_config and not input_config and not ros_bridge_config:
+        print("[INFO] No config given to the object.")
         q_init, wMo = ri.getObjectPose(q_init)
     #________________________________________
+
+    q_init[9:16] = check_height(q_init[9:16])
 
     poses = np.array(q_init[9:16])
 
@@ -286,6 +315,33 @@ def clean_path_vector():
             sys.stdout.flush()
     else:
         print("No path to clean.")
+
+def check_height(poses):
+    if poses[2] < 0.775:
+        # Force the height of the object if he is found under the box or the table
+        poses[2] = 0.7925 #76.5 + 1 + 1.7495 (height of the table + wide of the box + radius of the obj_tless-000001 base)
+        print("[INFO] Set the height to 77.5 cm.")
+    return poses
+
+def disable_collision():
+    srdf_disable_collisions = """<robot>"""
+    srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("box", "part")
+    srdf_disable_collisions += "</robot>"
+    robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
+
+    # from agimus_sot import Supervisor
+    # from agimus_sot.factory import Factory
+
+    # robotDict = globalDemoDict["robots"]
+
+    # supervisor = Supervisor(robot, prefix=list(robotDict.keys())[0])
+    # factory = Factory(supervisor)
+    # sm = SecurityMargins(ps, factory, ["part", "box"])
+    # sm.setSecurityMarginBetween("part", "box", 0.04)
+    # name = "{} > {} | f_12".format(g,h)
+    # cedge = wd(cgraph.get(graph.edges[name]))
+    # cedge.setSecurityMarginForPair("part", "box",float('-inf'))
 
 def multiview_data_acquisition(nb=10):
     print("The script will run",nb,"times. For each iteration, move the robot to the desired configuration then press ENTER.")
