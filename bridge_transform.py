@@ -76,11 +76,11 @@ def listen_to_happypose_detections():
             sys.stdout.write("Current time : %d \r" % (time_elapsed))
             sys.stdout.flush()
         
-        # Seperate the selected object from other detected object in the topic message
-        select_objects('tless-obj_000001')
+    # Seperate the selected object from other detected object in the topic message
+    select_objects('tless-obj_000001')
 
-        # Transform object in world frame
-        get_transform_all()
+    # Transform object in world frame
+    get_transform_all()
     
     if show_data:
         print("\n")
@@ -95,8 +95,13 @@ def select_objects(obj_name='tless-obj_000001'):
     global object_poses
     global object_message_list
 
+    try:
+        nb_obj = len(message.detections)
+    except:
+        print("The message is empty.")
+        
+
     object_message_list = []
-    nb_obj = len(message.detections)
     obj_id = 0
 
     for i in range(nb_obj):
@@ -138,11 +143,13 @@ def get_transform(obj_id=0):
     return pose_transformed.pose
 
 def get_transform_all():
+    global object_poses
     global object_message_list
     global tfBuffer
     global listener
 
     pose_list = []
+    name_list = list(object_poses.keys())
 
     print(len(object_message_list))
 
@@ -150,6 +157,14 @@ def get_transform_all():
     for obj_id in range(len(object_message_list)):
         transformed_pose = get_transform(obj_id)
         pose_list.append(transformed_pose)
+        object_pose = object_poses[str(name_list[obj_id])]
+        object_pose.x = transformed_pose.position.x
+        object_pose.y = transformed_pose.position.y
+        object_pose.z = transformed_pose.position.z
+        object_pose.theta_x = transformed_pose.orientation.x
+        object_pose.theta_y = transformed_pose.orientation.y
+        object_pose.theta_z = transformed_pose.orientation.z
+        object_pose.theta_w = transformed_pose.orientation.w
     return pose_list
 
 def run_pipeline():
