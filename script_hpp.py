@@ -168,34 +168,15 @@ binPicking.handles = handles
 binPicking.graphConstraints = ['locked_finger_1', 'locked_finger_2']
 
 def disable_collision():
-    srdf_disable_collisions = """<robot>"""
+    srdf_disable_collisions = """<robot>\n"""
     srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("base_link_0",
-                                                                  "base_link_0")
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("base_link_1",
-                                                                  "base_link_0")
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_2",
-                                                                "robot/part/base_link_0")
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_2",
-                                                                "robot/part/base_link_0")
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_3",
-                                                                  "robot/part/base_link_0")
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("box/base_link",
+                                                                  "part/base_link")
     srdf_disable_collisions += "</robot>"
     robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
     print(srdf_disable_collisions)
 
 disable_collision()
-
-srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
-# Disable collision between tiago/hand_safety_box_0 and driller
-srdf_disable_collisions_test = """<robot>"""
-srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/base_link")
-srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_top")
-srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_back")
-srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_left")
-srdf_disable_collisions_test += srdf_disable_collisions_fmt.format("tiago/hand_safety_box", "driller/tag_support_link_top_horizontal")
-
-print(srdf_disable_collisions_test)
 
 print("Building constraint graph")
 binPicking.buildGraph()
