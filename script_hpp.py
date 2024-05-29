@@ -170,7 +170,15 @@ binPicking.graphConstraints = ['locked_finger_1', 'locked_finger_2']
 def disable_collision():
     srdf_disable_collisions = """<robot>"""
     srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_0",
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("base_link_0",
+                                                                  "base_link_0")
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("base_link_1",
+                                                                  "base_link_0")
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_2",
+                                                                "robot/part/base_link_0")
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_2",
+                                                                "robot/part/base_link_0")
+    srdf_disable_collisions += srdf_disable_collisions_fmt.format("robot/box/base_link_3",
                                                                   "robot/part/base_link_0")
     srdf_disable_collisions += "</robot>"
     robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
@@ -196,8 +204,6 @@ q0 = [0, -pi/4, 0, -3*pi/4, 0, pi/2, pi/4, 0.035, 0.035,
       0, 0, 1.2, 0, 0, 0, 1,
       0, 0, 0.761, 0, 0, 0, 1]
 
-render = False # default value
-
 # Create effector
 print("Building effector.")
 binPicking.buildEffectors([ f'box/base_link_{i}' for i in range(5) ], q0)
@@ -207,7 +213,7 @@ binPicking.generateGoalConfigs(q0)
 
 #___________________________END_OF_GRAPH_GENERATION__________________________
 
-def GrabAndDrop(robot, ps, binPicking, render=False):
+def GrabAndDrop(robot, ps, binPicking, acq_type = None):
     # Get configuration of the robot
     ri = None
 
@@ -224,24 +230,28 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
     essaie = 0
 
     #____________GETTING_THE_POSE____________
-    test_config = True
-    input_config = False
-    ros_bridge_config = False
+
+    # Type of data acquisition
+    # test_config
+    # input_config
+    # ros_bridge_config
 
     # quaternion is X, Y, Z, W
 
-    if test_config:
+    if acq_type == 'test_config':
         print("[INFO] Test config.")
-        q_sim = [0,0, 0.65, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
+        q_sim = [0,0.2, 0.65, 0.2917479872902073, 0.6193081061291802, 0.6618066799607849, 0.30553641346668353]
         q_init, wMo = q_init,None
         print("test")
         q_init[9:16] = q_sim
-    if input_config:
+
+    if acq_type == 'input_config':
         print("[INFO] Given config.")
         q_input = input("Enter the XYZQUAT : ")
         q_input = ast.literal_eval(q_input)
         q_init[9:16], wMo =  q_input, None
-    if ros_bridge_config:
+
+    if acq_type == 'ros_bridge_config':
         print("[INFO] Make sure the /happypose/detections ros topic exist !")
         input("Press [ENTER] to proceed ...")
         data = btf.run_pipeline()
@@ -256,17 +266,16 @@ def GrabAndDrop(robot, ps, binPicking, render=False):
         quat = quat.normalised
         q_bridge = [data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]]
         q_init[9:16], wMo =  q_bridge, None
-    if not test_config and not input_config and not ros_bridge_config:
+
+    if acq_type !='test_config' and acq_type !='input_config' and acq_type !='ros_bridge_config':
         print("[INFO] No config given to the object.")
         q_init, wMo = ri.getObjectPose(q_init)
     #________________________________________
 
     q_init[9:16] = check_height(q_init[9:16])
-
     poses = np.array(q_init[9:16])
 
     print(q_init)
-
     print("\nPose of the object : \n",poses,"\n")
 
     while not found and essaie < 25:
@@ -385,4 +394,12 @@ if __name__ == '__main__':
     list_of_cam_pose= np.zeros(shape=(10,4,4))
     list_of_images = np.zeros(shape=(10,720,1280,3),dtype=np.uint8)
     list_of_q = np.zeros(shape=(10,7))
-    # q_init, p = GrabAndDrop(robot, ps, binPicking, render)
+
+    default_acq_type = 'ros_bridge_config'
+
+    # Type of data acquisition
+    # test_config
+    # input_config
+    # ros_bridge_config
+
+    # q_init, p = GrabAndDrop(robot, ps, binPicking, 'ros_bridge_config')
