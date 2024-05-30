@@ -228,8 +228,11 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
 
     if acq_type == 'input_config':
         print("[INFO] Given config.")
-        q_input = input("Enter the XYZQUAT : ")
-        q_input = ast.literal_eval(q_input)
+        data_input = input("Enter the XYZQUAT : ")
+        data_input = ast.literal_eval(data_input)
+        quat = Quaternion(data_input[3],data_input[4],data_input[5],data_input[6])
+        quat = quat.normalised
+        q_input = [data_input[0],data_input[1],data_input[2],quat[0], quat[1], quat[2], quat[3]]
         q_init[9:16], wMo =  q_input, None
 
     if acq_type == 'ros_bridge_config':
@@ -313,26 +316,6 @@ def check_height(poses):
         print("[INFO] Set the height to 77.5 cm.")
     return poses
 
-def disable_collision():
-    srdf_disable_collisions = """<robot>"""
-    srdf_disable_collisions_fmt = """  <disable_collisions link1="{}" link2="{}" reason=""/>\n"""
-    srdf_disable_collisions += srdf_disable_collisions_fmt.format("box", "part")
-    srdf_disable_collisions += "</robot>"
-    robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
-
-    # from agimus_sot import Supervisor
-    # from agimus_sot.factory import Factory
-
-    # robotDict = globalDemoDict["robots"]
-
-    # supervisor = Supervisor(robot, prefix=list(robotDict.keys())[0])
-    # factory = Factory(supervisor)
-    # sm = SecurityMargins(ps, factory, ["part", "box"])
-    # sm.setSecurityMarginBetween("part", "box", 0.04)
-    # name = "{} > {} | f_12".format(g,h)
-    # cedge = wd(cgraph.get(graph.edges[name]))
-    # cedge.setSecurityMarginForPair("part", "box",float('-inf'))
-
 def multiview_data_acquisition(nb=10):
     print("The script will run",nb,"times. For each iteration, move the robot to the desired configuration then press ENTER.")
     for k in range(nb):
@@ -379,8 +362,8 @@ if __name__ == '__main__':
     default_acq_type = 'ros_bridge_config'
 
     # Type of data acquisition
-    # test_config
-    # input_config
-    # ros_bridge_config
+    test_config = 'test_config'
+    input_config = 'input_config'
+    ros_bridge_config = 'ros_bridge_config'
 
     # q_init, p = GrabAndDrop(robot, ps, binPicking, 'ros_bridge_config')
