@@ -212,11 +212,6 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
 
     #____________GETTING_THE_POSE____________
 
-    # Type of data acquisition
-    # test_config
-    # input_config
-    # ros_bridge_config
-
     # quaternion is X, Y, Z, W
 
     if acq_type == 'test_config':
@@ -227,7 +222,7 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
         q_init[9:16] = q_sim
 
     if acq_type == 'input_config':
-        print("[INFO] Given config.")
+        print("[INFO] Input the config.")
         data_input = input("Enter the XYZQUAT : ")
         data_input = ast.literal_eval(data_input)
         quat = Quaternion(data_input[3],data_input[4],data_input[5],data_input[6])
@@ -250,6 +245,13 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
         quat = quat.normalised
         q_bridge = [data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]]
         q_init[9:16], wMo =  q_bridge, None
+
+    if 'given_config' in acq_type:
+        print("[INFO] Given config")
+        poses = acq_type.split(':')[1]
+        q_given = ast.literal_eval(poses)
+        print("The given config is : ",q_given)
+        q_init[9:16], wMo =  q_given, None
 
     if acq_type !='test_config' and acq_type !='input_config' and acq_type !='ros_bridge_config':
         print("[INFO] No config given to the object.")
@@ -365,5 +367,7 @@ if __name__ == '__main__':
     test_config = 'test_config'
     input_config = 'input_config'
     ros_bridge_config = 'ros_bridge_config'
+    given_config = 'given_config :'
+    # For 'given_config option, you not to enter 'given_config :[__your_pose__]'
 
     # q_init, p = GrabAndDrop(robot, ps, binPicking, 'ros_bridge_config')
