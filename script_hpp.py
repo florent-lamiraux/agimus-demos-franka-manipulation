@@ -287,6 +287,26 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
 
     return q_init,None
 
+def TakeAllObjects():
+    print("[INFO] Make sure the /happypose/detections ros topic exist !")
+    input("Press [ENTER] to proceed ...")
+    data = btf.run_pipeline()
+
+    for i in range(len(data)):
+        id = select_higher(data)
+        quat = Quaternion([data[id].orientation.x, data[id].orientation.y, data[id].orientation.z, data[id].orientation.w])
+        quat = quat.normalised
+        q_given = [data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]]
+        param = 'given_config :'+str(q_given)
+
+        q_init, p = GrabAndDrop(robot, ps, binPicking, param)
+
+        move_robot()
+        data.pop(id)
+
+    print("[INFO] Taking onjects sequence ended.")
+
+
 #______________________________Utility_funtions______________________________
 
 def move_robot():
@@ -315,7 +335,7 @@ def check_height(poses):
     if poses[2] < 0.775:
         # Force the height of the object if he is found under the box or the table
         poses[2] = 0.7925 #76.5 + 1 + 1.7495 (height of the table + wide of the box + radius of the obj_tless-000001 base)
-        print("[INFO] Set the height to 77.5 cm.")
+        print("[INFO] Set the height to 79.25 cm.")
     return poses
 
 def multiview_data_acquisition(nb=10):
@@ -348,6 +368,20 @@ def add_tless_to_scene(name, poses):
     print("[INFO] Add object", name, "to the scene.")
 
     c.gui.refresh()
+
+def select_higher(data):
+    if len(data) > 1:
+        max_Z = data[0].position.z
+        id = 0
+        for i in range(len(data)):
+            if data[i].position.z > max_Z:
+                id = i
+                max_Z = data[i].position.z
+                print(data[i].position.z,">",max_Z)
+    else:
+        id = 0
+    
+    return id
 
 #____________________________________________________________________________
 

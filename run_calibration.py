@@ -56,25 +56,3 @@ def compute_calibration(cc):
 
 if __name__ == '__main__':
     print("[START] Run calibration ready !")
-    # import rospy
-    # cc = CalibrationControl("panda2_hand", "camera_color_optical_frame",
-    # "panda2_ref_camera_link")
-    # cc.squareSize = 0.0254
-    # cc.joints = ['panda2_joint1', 'panda2_joint2', 'panda2_joint3',
-    #     'panda2_joint4', 'panda2_joint5', 'panda2_joint6',
-    #     'panda2_joint7', 'panda2_finger_joint1', 'panda2_finger_joint2', ]
-
-    # rospy.sleep (5.)
-    # i = 0
-    # nbPaths = cc.hppClient.problem.numberPaths ()
-    # while i < nbPaths - 1:
-    #     cc.playPath (i)
-    #     if not cc.errorOccured:
-    #         print("Ran {}".format(i))
-    #         i+=1
-    # if nbPaths > 1:
-    #     cc.playPath(nbPaths - 1, collect_data = False)
-    # cc.save()
-    # cc.computeHandEyeCalibration()
-    # eMc = cc.computeCameraPose()
-    # cc.writeCameraParameters(eMc)

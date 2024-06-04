@@ -12,19 +12,14 @@ If the /happypose/detections topic don't appear anymore in the rostopic list, us
 2. release the brakes,
 3. activate FCI,
 
-3.5 in terminal, change de $ROS_MASTER_URI and $ROS_IP to 'ROS_MASTER_URI=http://140.93.16.70:11311' and 'ROS_IP=140.93.16.70'
+4. in terminal, change de $ROS_MASTER_URI and $ROS_IP to 'ROS_MASTER_URI=http://140.93.16.70:11311' and 'ROS_IP=140.93.16.70'
    You can also enter for Akasan : 'export ROS_MASTER_URI=http://140.93.16.70:11311 export ROS_IP=140.93.16.70'
 
-4. in terminal 1, in this directory
+5. in terminal 1, in this directory
    ```bash
    cd ~/devel/src/agimus-demos/franka/manipulation
    roslaunch robot.launch arm_id:=panda2 robot_ip:=172.17.1.3
    ```
-5. to start the camera
-   ```bash
-   roslaunch realsense2_camera rs_camera.launch
-   ```
-
 6. to start agimus / SoT
    ```
    roslaunch demo.launch
@@ -40,24 +35,71 @@ If the /happypose/detections topic don't appear anymore in the rostopic list, us
    gepetto-gui
    ```
 
-9. Launch ros_cosypose 'happy_realtime_camera.launch'
+9. In the docker on Miyanoura, start those 2 commands :
    ```
-   roslaunch ros_cosypose happy_realtime_camera.launch
-   ```
-
-10. launch the script that computes path starting from the initial configuration
-   of the robot
-   ```
-   cd ~/devel/src/agimus-demos/franka/manipulation
-   python -i script_hpp.py
+   ros2 launch realsense2_camera rs_camera.py
+   ros2 launch ros_bridge
    ```
 
-11. When the script ask you to launch the service, enter the command : 
-   ```
-   rosservice call happypose_inference
-   ```
+<details>
+   For multiview :
+   <summary>Multiview</summary>
+   10. In the docker, run the happypose multiview command : 
+      ```
+      ros2 launch happypose multiview
+      ```
 
-12. To execute a path
-   ```
-   rosrun agimus rqt_path_execution
-   ```
+   11. Start gathering the images.
+      To do so move the robot do the desired position, where all objects are visible, and run this command :
+      ```
+      ros2 run multiview ... #
+      ```
+      Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
+      ```
+      ros2 run multiview ... 9
+      ```
+
+   12. Publish cam view to cam topic for happypose multiview to process the images.
+      ```
+      ros2 topic ...
+      ```
+
+   13. Happypose will publish the poses in the topic /happypose/detections.
+
+   14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
+</details>
+
+#_____________________________________________________
+
+<details>
+   For singleview :
+   <summary>Singleview</summary>
+   10. In the docker, run the happypose multiview command : 
+      ```
+      ros2 launch happypose multiview
+      ```
+
+   11. Start gathering the images.
+      To do so move the robot do the desired position, where all objects are visible, and run this command :
+      ```
+      ros2 run multiview ... #
+      ```
+      Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
+      ```
+      ros2 run multiview ... 9
+      ```
+
+   12. Publish cam view to cam topic for happypose multiview to process the images.
+      ```
+      ros2 topic ...
+      ```
+
+   13. Happypose will publish the poses in the topic /happypose/detections.
+
+   14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
+
+   12. To execute a path
+      ```
+      rosrun agimus rqt_path_execution
+      ```
+</details>
