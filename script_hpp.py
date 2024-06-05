@@ -174,8 +174,7 @@ def disable_collision():
                                                                   "part/base_link")
     srdf_disable_collisions += "</robot>"
     robot.client.manipulation.robot.insertRobotSRDFModelFromString("", srdf_disable_collisions)
-    print(srdf_disable_collisions)
-
+    
 disable_collision()
 
 print("Building constraint graph")
@@ -205,10 +204,6 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
         assert(res)
     else:
         q_init = q0[:]
-
-    # Detecting the object poses
-    found = False
-    essaie = 0
 
     #____________GETTING_THE_POSE____________
 
@@ -248,16 +243,20 @@ def GrabAndDrop(robot, ps, binPicking, acq_type = None):
         print("The given config is : ",q_given)
         q_init[9:16], wMo =  q_given, None
 
-    if acq_type !='test_config' and acq_type !='input_config' and acq_type !='ros_bridge_config':
+    if acq_type !='test_config' and acq_type !='input_config' and acq_type !='ros_bridge_config' and 'given_config' not in acq_type:
         print("[INFO] No config given to the object.")
         q_init, wMo = ri.getObjectPose(q_init)
-    #________________________________________
+    #___________________________________________
 
     q_init[9:16] = check_height(q_init[9:16])
     poses = np.array(q_init[9:16])
 
     print(q_init)
     print("\nPose of the object : \n",poses,"\n")
+
+    # Detecting the object poses
+    found = False
+    essaie = 0
 
     while not found and essaie < 25:
         found, msg = robot.isConfigValid(q_init)
@@ -296,10 +295,12 @@ def TakeAllObjects():
 
         q_init, p = GrabAndDrop(robot, ps, binPicking, param)
 
-        move_robot()
+        move = input("Play the movement ? [y/n] : ")
+        if move == 'y':
+            move_robot()
         data.pop(id)
 
-    print("[INFO] Taking onjects sequence ended.")
+    print("[INFO] Taking objects sequence ended.")
 
 
 #______________________________Utility_funtions______________________________
@@ -395,7 +396,7 @@ def multiposes_refinement(iterations = 10):
                      np.mean(multiposes[:][4]),np.mean(multiposes[:][5]),np.mean(multiposes[:][6])]
     print(refined_poses)
 
-    return refined_poses
+    return refined_poses,multiposes
 
 #____________________________________________________________________________
 
@@ -414,6 +415,5 @@ if __name__ == '__main__':
     input_config = 'input_config'
     ros_bridge_config = 'ros_bridge_config'
     given_config = 'given_config :'
-    # For 'given_config option, you not to enter 'given_config :[__your_pose__]'
 
     # q_init, p = GrabAndDrop(robot, ps, binPicking, 'ros_bridge_config')
