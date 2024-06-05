@@ -48,7 +48,11 @@ If the /happypose/detections topic don't appear anymore in the rostopic list, us
 <summary>Multiview</summary>
 
 10. In the docker, run the happypose multiview command : 
+<<<<<<< HEAD
    ```bash
+=======
+   ```
+>>>>>>> 66e4a9a ([script_hpp/README] Add refining pose function / Change the README.md file)
    ros2 launch happypose multiview
    ```
 
