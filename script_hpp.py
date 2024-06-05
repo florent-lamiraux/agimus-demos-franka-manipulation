@@ -391,9 +391,9 @@ def multiposes_refinement(iterations = 10):
         multiposes.append([data[id].position.x, data[id].position.y, data[id].position.z,quat[0], quat[1], quat[2], quat[3]])
         print("[INFO] Wait 2s ...")
         time.sleep(2)
-
-    refined_poses = [np.mean(multiposes[:][0]),np.mean(multiposes[:][1]),np.mean(multiposes[:][2]),np.mean(multiposes[:][3]),
-                     np.mean(multiposes[:][4]),np.mean(multiposes[:][5]),np.mean(multiposes[:][6])]
+    multiposes = np.array(multiposes)
+    refined_poses = [np.mean(multiposes[:,0]),np.mean(multiposes[:,1]),np.mean(multiposes[:,2]),np.mean(multiposes[:,3]),
+                     np.mean(multiposes[:,4]),np.mean(multiposes[:,5]),np.mean(multiposes[:,6])]
     print(refined_poses)
 
     return refined_poses,multiposes
