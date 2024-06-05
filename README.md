@@ -41,65 +41,81 @@ If the /happypose/detections topic don't appear anymore in the rostopic list, us
    ros2 launch ros_bridge
    ```
 
+<br/>
+
+# Multiview
 <details>
-   For multiview :
-   <summary>Multiview</summary>
-   10. In the docker, run the happypose multiview command : 
-      ```
-      ros2 launch happypose multiview
-      ```
+<summary>Multiview</summary>
 
-   11. Start gathering the images.
-      To do so move the robot do the desired position, where all objects are visible, and run this command :
-      ```
-      ros2 run multiview ... #
-      ```
-      Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
-      ```
-      ros2 run multiview ... 9
-      ```
+10. In the docker, run the happypose multiview command : 
+   ```bash
+   ros2 launch happypose multiview
+   ```
 
-   12. Publish cam view to cam topic for happypose multiview to process the images.
-      ```
-      ros2 topic ...
-      ```
+11. Start gathering the images.
+   To do so move the robot do the desired position, where all objects are visible, and run this command :
+   ```
+   ros2 run multiview ... #
+   ```
+   Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
+   ```
+   ros2 run multiview ... 9
+   ```
 
-   13. Happypose will publish the poses in the topic /happypose/detections.
+12. Publish cam view to cam topic for happypose multiview to process the images.
+   ```
+   ros2 topic ...
+   ```
 
-   14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
+13. Happypose will publish the poses in the topic /happypose/detections.
+
+14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
 </details>
 
-#_____________________________________________________
+<br/>
 
+# Singleview
 <details>
-   For singleview :
-   <summary>Singleview</summary>
-   10. In the docker, run the happypose multiview command : 
-      ```
-      ros2 launch happypose multiview
-      ```
+<summary>Singleview</summary>
+10. In the docker, run the happypose multiview command : 
+   ```
+   ros2 launch happypose multiview
+   ```
 
-   11. Start gathering the images.
-      To do so move the robot do the desired position, where all objects are visible, and run this command :
-      ```
-      ros2 run multiview ... #
-      ```
-      Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
-      ```
-      ros2 run multiview ... 9
-      ```
+11. Start gathering the images.
+   To do so move the robot do the desired position, where all objects are visible, and run this command :
+   ```
+   ros2 run multiview ... #
+   ```
+   Replace the # with the number of your shot (from 0 to a max of 9). Your last shot should be :
+   ```
+   ros2 run multiview ... 9
+   ```
 
-   12. Publish cam view to cam topic for happypose multiview to process the images.
-      ```
-      ros2 topic ...
-      ```
+12. Publish cam view to cam topic for happypose multiview to process the images.
+   ```
+   ros2 topic ...
+   ```
 
-   13. Happypose will publish the poses in the topic /happypose/detections.
+13. Happypose will publish the poses in the topic /happypose/detections.
 
-   14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
+14. in another terminal you can run ```python -i script_hpp.py``` and get the poses with ```btf.run_pipeline()```.
 
-   12. To execute a path
-      ```
-      rosrun agimus rqt_path_execution
-      ```
 </details>
+
+<br/>
+
+# Playing the generated path on the robot
+
+To execute a path you have 2 options.
+
+First one with graphic interface to select the path you want to play :
+   ```
+   rosrun agimus rqt_path_execution
+   ```
+
+The second one if you want to play the latest path added to the ProblemSolver (only available in script_hpp) :
+   ```
+   move_robot()
+   ```
+
