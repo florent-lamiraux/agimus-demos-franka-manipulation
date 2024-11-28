@@ -58,8 +58,6 @@ from multiprocessing import Process, Queue
 from pyquaternion import Quaternion
 
 from agimus_demos.tools_hpp import concatenatePaths
-from agimus_demos.calibration.play_path import CalibrationControl, playAllPaths
-from agimus_demos.calibration import HandEyeCalibration as Calibration
 from hpp.corbaserver.manipulation import ConstraintGraphFactory as Factory
 
 logger = getLogger(__name__)
@@ -304,14 +302,6 @@ def TakeAllObjects():
 
 
 #______________________________Utility_funtions______________________________
-
-def move_robot():
-    path_id = ps.numberPaths()
-    cc = CalibrationControl("panda2_hand","camera_color_optical_frame","panda2_ref_camera_link")
-    input("Press Enter to start the movement ...")
-    cc.playPath(path_id - 1,collect_data = False)
-    if not cc.errorOccured:
-        print("Ran {}".format(path_id))
 
 def clean_path_vector():
     # Cleaning the path vector

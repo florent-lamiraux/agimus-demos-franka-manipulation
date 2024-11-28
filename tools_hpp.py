@@ -26,7 +26,7 @@
 
 import numpy as np
 import os
-import rospy, tf2_ros
+import rclpy, tf2_ros
 import numpy
 from hpp import Transform
 from math import sqrt, pi
@@ -109,21 +109,21 @@ class RosInterface(Parent):
         print("...")
         
         while not found:
-            if self.tfBuffer.can_transform(cameraFrame, objectFrame_2, rospy.Time()):
+            if self.tfBuffer.can_transform(cameraFrame, objectFrame_2, rclpy.Time()):
                 obj_found = objectFrame_2
                 found = True
                 print("Object Tless 2 found.")
-            if self.tfBuffer.can_transform(cameraFrame, objectFrame_1, rospy.Time()):
+            if self.tfBuffer.can_transform(cameraFrame, objectFrame_1, rclpy.Time()):
                 obj_found = objectFrame_1
                 found = True
                 print("Object Tless 1 found.")
-            rospy.sleep(0.01)
+            rclpy.sleep(0.01)
         
         print("[INFO] Pose found !")
         print("... Starting calculating transform in the camera frame land mark ...")
         wMc = XYZQUATToSE3(self.robot.hppcorba.robot.getJointsPosition(q0, [self.robotPrefix + cameraFrame])[0])
         try:
-            _cMo = self.tfBuffer.lookup_transform(cameraFrame, obj_found, rospy.Time(), rospy.Duration(timeout))
+            _cMo = self.tfBuffer.lookup_transform(cameraFrame, obj_found, rclpy.Time(), rclpy.Duration(timeout))
             _cMo = _cMo.transform
             # renormalize quaternion
             x = _cMo.rotation.x
